@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><title>(云计算) 如何解决Serverless函数冷启动的问题？ - 面向问题编程</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="面向问题编程"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="面向问题编程"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="背景  如果你的PaaS能够有效地在20毫秒内启动实例并运行半秒,那么就可以称之为Serverless。  —— AWS云架构战略副总裁Adrian Cockcroft1   Serverless的最大卖点之一就是在做弹性伸缩时可以将实例数缩到0，没流量时不花钱，有流量来时再扩容。然而理想很丰满，现实很骨感。 无论是在流量刚到达时实例数从0到1，还是为了处理更多的流量将实例数从m扩到n的过程，不得"><meta property="og:type" content="blog"><meta property="og:title" content="(云计算) 如何解决Serverless函数冷启动的问题？"><meta property="og:url" content="https://www.heapoverflow.cn/pages/serverless-coldstart/"><meta property="og:site_name" content="面向问题编程"><meta property="og:description" content="背景  如果你的PaaS能够有效地在20毫秒内启动实例并运行半秒,那么就可以称之为Serverless。  —— AWS云架构战略副总裁Adrian Cockcroft1   Serverless的最大卖点之一就是在做弹性伸缩时可以将实例数缩到0，没流量时不花钱，有流量来时再扩容。然而理想很丰满，现实很骨感。 无论是在流量刚到达时实例数从0到1，还是为了处理更多的流量将实例数从m扩到n的过程，不得"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://www.heapoverflow.cn/img/vector_landscape_2.svg"><meta property="article:published_time" content="2022-02-27T01:45:46.476Z"><meta property="article:modified_time" content="2022-02-27T09:39:49.263Z"><meta property="article:author" content="面向问题编程"><meta property="article:tag" content="业务场景"><meta property="article:tag" content="Serverless"><meta property="twitter:card" content="summary"><meta property="twitter:image" content="/img/vector_landscape_2.svg"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.heapoverflow.cn/pages/serverless-coldstart/"},"headline":"(云计算) 如何解决Serverless函数冷启动的问题？","image":[],"datePublished":"2022-02-27T01:45:46.476Z","dateModified":"2022-02-27T09:39:49.263Z","author":{"@type":"Person","name":"面向问题编程"},"publisher":{"@type":"Organization","name":"面向问题编程","logo":{"@type":"ImageObject","url":"https://www.heapoverflow.cn/img/logo.svg"}},"description":"背景  如果你的PaaS能够有效地在20毫秒内启动实例并运行半秒,那么就可以称之为Serverless。  —— AWS云架构战略副总裁Adrian Cockcroft1   Serverless的最大卖点之一就是在做弹性伸缩时可以将实例数缩到0，没流量时不花钱，有流量来时再扩容。然而理想很丰满，现实很骨感。 无论是在流量刚到达时实例数从0到1，还是为了处理更多的流量将实例数从m扩到n的过程，不得"}</script><link rel="canonical" href="https://www.heapoverflow.cn/pages/serverless-coldstart/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><script src="https://www.googletagmanager.com/gtag/js?id=G-ETGL163DQH" async></script><script>window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    
+        gtag('config', 'G-ETGL163DQH');</script><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><script data-ad-client="ca-pub-6757924689439593" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+          Array
+              .from(document.querySelectorAll('.tab-content'))
+              .forEach($tab => {
+                  $tab.classList.add('is-hidden');
+              });
+          Array
+              .from(document.querySelectorAll('.tabs li'))
+              .forEach($tab => {
+                  $tab.classList.remove('is-active');
+              });
+          const $activeTab = document.querySelector(location.hash);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+          const $tabMenu = document.querySelector(`a[href="${location.hash}"]`);
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 6.0.0"></head><body class="is-2-column"><nav class="navbar navbar-main"><div class="container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/archives">归档</a></div><div class="navbar-end"><a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;"><i class="fas fa-list-ul"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-9-widescreen"><div class="card"><div class="card-image"><span class="image is-7by3"><img class="fill" src="/img/vector_landscape_2.svg" alt="(云计算) 如何解决Serverless函数冷启动的问题？"></span></div><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-02-27T01:45:46.476Z" title="2022/2/27 上午9:45:46">2022-02-27</time>发表</span><span class="level-item"><time dateTime="2022-02-27T09:39:49.263Z" title="2022/2/27 下午5:39:49">2022-02-27</time>更新</span><span class="level-item"><a class="link-muted" href="/categories/Serverless/">Serverless</a></span><span class="level-item">7 分钟读完 (大约1041个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">(云计算) 如何解决Serverless函数冷启动的问题？</h1><div class="content"><h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><article class="message is-primary" style="font-size:inherit">
+<div class="message-body">
+如果你的PaaS能够有效地在20毫秒内启动实例并运行半秒,那么就可以称之为Serverless。
+</div>
+—— AWS云架构战略副总裁Adrian Cockcroft<sup>1</sup>
+</article>
+
+<p>Serverless的最大卖点之一就是在做弹性伸缩时可以将实例数缩到0，<strong>没流量时不花钱，有流量来时再扩容</strong>。然而理想很丰满，现实很骨感。
+无论是在流量刚到达时实例数从0到1，还是为了处理更多的流量将实例数从m扩到n的过程，不得不面对的一个问题就是：冷启动。冷启动时间太长，
+就会出现请求超时。</p>
+<span id="more"></span>
+
+<h2 id="何为冷启动"><a href="#何为冷启动" class="headerlink" title="何为冷启动"></a>何为冷启动</h2><article class="message is-primary" style="font-size:inherit">
+<div class="message-body">
+冷启动是指在函数调用链路中包含了资源调度、镜像/代码下载、启动容器、运行时初始化、用户代码初始化等环节。当冷启动完成后，函数实例就绪，
+后续请求就能直接被函数执行<sup>2</sup>。
+</div>
+</article>
+
+<p><img src="https://p1.meituan.net/travelcube/30977c4a776c81958e694f7e649abcf241906.png" alt="Serverless冷启动&lt;sup&gt;2&lt;/sup&gt;"></p>
+<h2 id="传统的优化方案"><a href="#传统的优化方案" class="headerlink" title="传统的优化方案"></a>传统的优化方案</h2><h3 id="尽量避免冷启动"><a href="#尽量避免冷启动" class="headerlink" title="尽量避免冷启动"></a><strong>尽量避免冷启动</strong></h3><ul>
+<li>某个实例处理完请求后，不会因为后面2，3分钟没流量就被销毁。各个厂商都会让其继续存在一段时间，比如30分钟。</li>
+<li>预热<ul>
+<li><em>Amazon EventBridge</em>。搞个定时任务定时去触发Lambda实例，比如每5分钟触发一次<sup>3</sup>。
+  “这样在真正想要处理的事件抵达之前，就会有已经被预热 Lambda 保持激活状态以等待响应”。这种方法也可以用来处理在出现时间上具有规律的流量高峰。</li>
+<li><em>预置并发</em>。”预置并发是 AWS Lambda 在 2019 年推出的一个功能，该功能能够指定处于激活状态的 Lambda 实例数量，使函数保持初始化状态”。
+  在k8s就是相当于给HPA设定个最小副本数呗<sup>3</sup>。</li>
+</ul>
+</li>
+</ul>
+<p>除了浪费资源，上面的策略也无法解决突发流量场景下从m扩到n时的冷启动问题。</p>
+<h3 id="调度"><a href="#调度" class="headerlink" title="调度"></a><strong>调度</strong></h3><ul>
+<li>（腾讯）降低调度复杂度<sup>4</sup>。</li>
+</ul>
+<article class="message is-warning" style="font-size:inherit">
+<div class="message-body">
+原有的调度模块需要考虑的维度很多：
+数十种虚拟机的配置、CPU/内存/存储/网络等亲和性和反亲和性、
+部署组的需求-跨宿主机，交换机，机架、资源利用率、碎片填充......
+<br><br>
+轻量化调度模块：少数的虚拟机配置、宿主机的可用资源离线计算
+</div>
+</article>
+
+
+<h3 id="容器启动"><a href="#容器启动" class="headerlink" title="容器启动"></a><strong>容器启动</strong></h3><ul>
+<li>（腾讯）轻量级虚拟机<sup>4</sup>。</li>
+</ul>
+<h4 id="网络"><a href="#网络" class="headerlink" title="网络"></a>网络</h4><ul>
+<li>（腾讯）SCF网络<sup>4</sup></li>
+</ul>
+<h3 id="镜像-x2F-代码下载"><a href="#镜像-x2F-代码下载" class="headerlink" title="镜像&#x2F;代码下载"></a><strong>镜像&#x2F;代码下载</strong></h3><ul>
+<li>（平台侧）代码缓存<sup>4</sup>。</li>
+<li>（用户侧）既然代码下载耗时，那你尽可能减小代码包的大小吧。比如在程序中移除不必要的代码、减少不必要的第三方库依赖等。</li>
+</ul>
+<h3 id="运行时初始化"><a href="#运行时初始化" class="headerlink" title="运行时初始化"></a><strong>运行时初始化</strong></h3><ul>
+<li>如果是用Java, 可以禁掉JVM的分层编译以降低运行速度的代价来换取启动速度的提升<sup>3</sup>。</li>
+</ul>
+<h2 id="其它优化方案"><a href="#其它优化方案" class="headerlink" title="其它优化方案"></a>其它优化方案</h2><h3 id="WebAssembly"><a href="#WebAssembly" class="headerlink" title="WebAssembly"></a><strong>WebAssembly</strong></h3><ul>
+<li><a target="_blank" rel="noopener" href="https://www.infoq.cn/article/recogqiurqatyy7dj6ha">WebAssembly 与 Kubernetes 双剑合璧：机遇与挑战</a></li>
+<li><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/363308118">云原生的 WebAssembly 能取代 Docker 吗？</a></li>
+</ul>
+<p><img src="https://pic2.zhimg.com/80/v2-a6734e595f1175d2620506f6ee774145_1440w.jpg" alt="WebAssembly vs Docker"></p>
+<h3 id="Isolates"><a href="#Isolates" class="headerlink" title="Isolates"></a><strong>Isolates</strong></h3><p>CloudFlare的方案 <a target="_blank" rel="noopener" href="https://blog.cloudflare.com/cloud-computing-without-containers/">Cloud Computing without Containers</a></p>
+<p>其Serverless平台<a target="_blank" rel="noopener" href="https://workers.cloudflare.com/">Workers</a>已宣称零冷启动时间。</p>
+<article class="message is-primary" style="font-size:inherit">
+<div class="message-body">
+ Say goodbye to cold starts—support for 0ms worldwide
+</div>
+</article>
+
+<h2 id="各个厂商的冷启动时延"><a href="#各个厂商的冷启动时延" class="headerlink" title="各个厂商的冷启动时延"></a>各个厂商的冷启动时延</h2><p>?</p>
+<h2 id="参考链接"><a href="#参考链接" class="headerlink" title="参考链接"></a>参考链接</h2><ol>
+<li>AWS <a target="_blank" rel="noopener" href="https://aws.amazon.com/cn/blogs/china/iaas-faas-serverless/">从IaaS到FaaS—— Serverless架构的前世今生</a></li>
+<li>美团 <a target="_blank" rel="noopener" href="https://tech.meituan.com/2021/04/21/nest-serverless.html">Serverless平台Nest的探索与实践</a></li>
+<li>亚马逊 <a target="_blank" rel="noopener" href="https://aws.amazon.com/cn/blogs/china/4-solutions-to-reduce-the-cold-start-time-of-aws-lambda/">降低AWS Lambda 冷启动时间的4种方案</a></li>
+<li>腾讯云 <a target="_blank" rel="noopener" href="https://static001.geekbang.org/con/40/pdf/1190960527/file/%E5%91%A8%E7%BB%B4%E8%B7%83-Serverless%E5%B9%B3%E5%8F%B0%E5%86%B7%E5%90%AF%E5%8A%A8%E4%BC%98%E5%8C%96.pdf">Go FaaSter ：Serverless平台冷启动优化</a></li>
+</ol>
+<article class="message is-warning" style="font-size:inherit">
+<div class="message-body">
+ 持续更新中...
+</div>
+</article>
+</div><div class="article-licensing box"><div class="licensing-title"><p>(云计算) 如何解决Serverless函数冷启动的问题？</p><p><a href="https://www.heapoverflow.cn/pages/serverless-coldstart/">https://www.heapoverflow.cn/pages/serverless-coldstart/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>面向问题编程</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2022-02-27</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2022-02-27</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E4%B8%9A%E5%8A%A1%E5%9C%BA%E6%99%AF/">业务场景</a><a class="link-muted mr-2" rel="tag" href="/tags/Serverless/">Serverless</a></div><!--!--><div><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6757924689439593" crossOrigin="anonymous"></script><ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-6757924689439593" data-ad-slot="2352785969"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div></article></div><!--!--><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/pages/ts-anomaly-detection/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">(智能运维) 如何对业务指标和基础监控指标做异常检测？</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/pages/problems/"><span class="level-item">不知道做啥？看下那些真实业务场景下的技术问题</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><!--!--><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen  order-3 is-sticky"><div class="card widget" id="toc" data-type="toc"><div class="card-content"><div class="menu"><h3 class="menu-label">目录</h3><ul class="menu-list"><li><a class="level is-mobile" href="#背景"><span class="level-left"><span class="level-item">1</span><span class="level-item">背景</span></span></a></li><li><a class="level is-mobile" href="#何为冷启动"><span class="level-left"><span class="level-item">2</span><span class="level-item">何为冷启动</span></span></a></li><li><a class="level is-mobile" href="#传统的优化方案"><span class="level-left"><span class="level-item">3</span><span class="level-item">传统的优化方案</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#尽量避免冷启动"><span class="level-left"><span class="level-item">3.1</span><span class="level-item">尽量避免冷启动</span></span></a></li><li><a class="level is-mobile" href="#调度"><span class="level-left"><span class="level-item">3.2</span><span class="level-item">调度</span></span></a></li><li><a class="level is-mobile" href="#容器启动"><span class="level-left"><span class="level-item">3.3</span><span class="level-item">容器启动</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#网络"><span class="level-left"><span class="level-item">3.3.1</span><span class="level-item">网络</span></span></a></li></ul></li><li><a class="level is-mobile" href="#镜像-x2F-代码下载"><span class="level-left"><span class="level-item">3.4</span><span class="level-item">镜像/代码下载</span></span></a></li><li><a class="level is-mobile" href="#运行时初始化"><span class="level-left"><span class="level-item">3.5</span><span class="level-item">运行时初始化</span></span></a></li></ul></li><li><a class="level is-mobile" href="#其它优化方案"><span class="level-left"><span class="level-item">4</span><span class="level-item">其它优化方案</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#WebAssembly"><span class="level-left"><span class="level-item">4.1</span><span class="level-item">WebAssembly</span></span></a></li><li><a class="level is-mobile" href="#Isolates"><span class="level-left"><span class="level-item">4.2</span><span class="level-item">Isolates</span></span></a></li></ul></li><li><a class="level is-mobile" href="#各个厂商的冷启动时延"><span class="level-left"><span class="level-item">5</span><span class="level-item">各个厂商的冷启动时延</span></span></a></li><li><a class="level is-mobile" href="#参考链接"><span class="level-left"><span class="level-item">6</span><span class="level-item">参考链接</span></span></a></li></ul></div></div><style>#toc .menu-list > li > a.is-active + .menu-list { display: block; }#toc .menu-list > li > a + .menu-list { display: none; }</style><script src="/js/toc.js" defer></script></div><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg"></figure><p class="is-size-6 is-block">公众号：面向问题编程</p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives"><p class="title">4</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories"><p class="title">3</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags"><p class="title">5</p></a></div></div></nav></div></div><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/Serverless/"><span class="level-start"><span class="level-item">Serverless</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E5%A4%A7%E6%95%B0%E6%8D%AE/"><span class="level-start"><span class="level-item">大数据</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%99%BA%E8%83%BD%E8%BF%90%E7%BB%B4/"><span class="level-start"><span class="level-item">智能运维</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li></ul></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a><p class="is-size-7"><span>&copy; 2022 面向问题编程</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-CN");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script type="text/x-mathjax-config">MathJax.Hub.Config({
+            'HTML-CSS': {
+                matchFontHeight: false
+            },
+            SVG: {
+                matchFontHeight: false
+            },
+            CommonHTML: {
+                matchFontHeight: false
+            },
+            tex2jax: {
+                inlineMath: [
+                    ['$','$'],
+                    ['\\(','\\)']
+                ]
+            }
+        });</script><script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.9/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script><!--!--><!--!--><!--!--><script src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script src="/js/insight.js" defer></script><script>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script></body></html>
