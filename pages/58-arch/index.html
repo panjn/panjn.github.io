@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><title>58同城的技术架构 - 面向问题编程</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="面向问题编程"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="面向问题编程"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="单机系统Windows全家桶  Windows + IIS + SQL Server + C-Sharp —— 面向问题编程"><meta property="og:type" content="blog"><meta property="og:title" content="58同城的技术架构"><meta property="og:url" content="https://www.heapoverflow.cn/pages/58-arch/"><meta property="og:site_name" content="面向问题编程"><meta property="og:description" content="单机系统Windows全家桶  Windows + IIS + SQL Server + C-Sharp —— 面向问题编程"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://www.heapoverflow.cn/img/58.svg"><meta property="article:published_time" content="2022-03-05T01:02:18.289Z"><meta property="article:modified_time" content="2022-03-05T03:56:26.480Z"><meta property="article:author" content="面向问题编程"><meta property="twitter:card" content="summary"><meta property="twitter:image" content="/img/58.svg"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.heapoverflow.cn/pages/58-arch/"},"headline":"58同城的技术架构","image":[],"datePublished":"2022-03-05T01:02:18.289Z","dateModified":"2022-03-05T03:56:26.480Z","author":{"@type":"Person","name":"面向问题编程"},"publisher":{"@type":"Organization","name":"面向问题编程","logo":{"@type":"ImageObject","url":"https://www.heapoverflow.cn/img/logo.svg"}},"description":"单机系统Windows全家桶  Windows + IIS + SQL Server + C-Sharp —— 面向问题编程"}</script><link rel="canonical" href="https://www.heapoverflow.cn/pages/58-arch/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><script src="https://www.googletagmanager.com/gtag/js?id=G-ETGL163DQH" async></script><script>window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    
+        gtag('config', 'G-ETGL163DQH');</script><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><script data-ad-client="ca-pub-6757924689439593" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+          Array
+              .from(document.querySelectorAll('.tab-content'))
+              .forEach($tab => {
+                  $tab.classList.add('is-hidden');
+              });
+          Array
+              .from(document.querySelectorAll('.tabs li'))
+              .forEach($tab => {
+                  $tab.classList.remove('is-active');
+              });
+          const $activeTab = document.querySelector(location.hash);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+          const $tabMenu = document.querySelector(`a[href="${location.hash}"]`);
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 6.0.0"></head><body class="is-2-column"><nav class="navbar navbar-main"><div class="container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/categories">分类</a><a class="navbar-item" href="/tags">标签</a><a class="navbar-item" href="/archives">归档</a></div><div class="navbar-end"><a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;"><i class="fas fa-list-ul"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-9-widescreen"><div class="card"><div class="card-image"><span class="image is-7by3"><img class="fill" src="/img/58.svg" alt="58同城的技术架构"></span></div><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-03-05T01:02:18.289Z" title="2022/3/5 上午9:02:18">2022-03-05</time>发表</span><span class="level-item"><time dateTime="2022-03-05T03:56:26.480Z" title="2022/3/5 上午11:56:26">2022-03-05</time>更新</span><span class="level-item"><a class="link-muted" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/">技术架构</a></span><span class="level-item">13 分钟读完 (大约1974个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">58同城的技术架构</h1><div class="content"><h2 id="单机系统"><a href="#单机系统" class="headerlink" title="单机系统"></a>单机系统</h2><h3 id="Windows全家桶"><a href="#Windows全家桶" class="headerlink" title="Windows全家桶"></a>Windows全家桶</h3><article class="message is-warning" style="font-size:inherit">
+<div class="message-body">
+Windows + IIS + SQL Server + C-Sharp</div>
+—— 面向问题编程
+</article>
+
+<span id="more"></span>
+
+<p>建站之初，站点流量非常小，可能低于十万级别。这意味着，平均每秒钟也就几次访问。请求量比较低，数据量比较小，代码量也比较小，几个工程师，很短的时间搭起这样的系统，甚至没有考虑“架构”的问题。</p>
+<p>和许多创业公司初期一样，最初58同城的站点架构特点是“ALL-IN-ONE”：</p>
+<p><img src="/img/58-arch1.png" alt="58同城 单体架构"></p>
+<p>这是一个单机系统，所有的站点、数据库、文件都部署在一台服务器上。工程师每天的核心工作是CURD，浏览器端传过来一些数据，解析GET&#x2F;POST&#x2F;COOKIE中传过来的数据，拼装成一些CURD的sql语句访问数据库，数据库返回数据，拼装成页面，返回浏览器。相信很多创业团队的工程师，初期做的也是类似的工作。</p>
+<p>58同城最初选择的是微软技术体系这条路：Windows、iis、SQL-Sever、C#</p>
+<h3 id="LAMP"><a href="#LAMP" class="headerlink" title="LAMP"></a>LAMP</h3><p>如果重新再来，我们可能会选择LAMP（Linux + Apache + MySQL + PHP）体系。</p>
+<article class="message message-immersive is-primary">
+<div class="message-body">
+<i class="fas fa-question-circle mr-2"></i> 为什么选择LAMP？
+</div>
+</article>
+
+<p>LAMP无须编译，发布快速，功能强大，社区活跃，从前端+后端+数据库访问+业务逻辑处理全部可以搞定，并且开源免费，公司做大了也不会有人上门收钱（不少公司吃过亏）。现在大家如果再创业，强烈建议使用LAMP。</p>
+<article class="message is-warning" style="font-size:inherit">
+<div class="message-body">
+<img src="/img/lamp.png" alt=""/></div>
+—— 面向问题编程
+</article>
+
+<h3 id="ORM-更好地CRUD"><a href="#ORM-更好地CRUD" class="headerlink" title="ORM, 更好地CRUD"></a>ORM, 更好地CRUD</h3><p>初创阶段，工程师面临的主要问题：写CURD的sql语句很容易出错。</p>
+<p>我们在这个阶段引进DAO（Data Access Object）和ORM（Object Relational Mapping
+），让工程师们不再直接面对CURD的sql语句，而是面对他们比较擅长的面向对象开发，极大的提高了编码效率，降低了出错率。</p>
+<p><img src="/img/58-arch1-1.png" alt="58同城 单体架构的"></p>
+<h2 id="分布式系统"><a href="#分布式系统" class="headerlink" title="分布式系统"></a>分布式系统</h2><p>随着流量越来越大，老板不只要求“有一个可以看见的站点”，他希望网站能够正常访问，当然速度快点就更好了。</p>
+<p>而此时系统面临问题是：流量的高峰期容易宕机，大量的请求会压到数据库上，数据库成为新的瓶颈，人多并行访问时站点非常卡。这时，我们的机器数量也从一台变成了多台，我们的系统成了所谓的（伪）“分布式架构”：</p>
+<p><img src="/img/58-arch2.png" alt="58同城 动静分离和读写分离"></p>
+<h3 id="再见，Windows全家桶"><a href="#再见，Windows全家桶" class="headerlink" title="再见，Windows全家桶"></a>再见，Windows全家桶</h3><p>当流量达到百万甚至千万时，站点面临一个很大的问题就是性能和成本的折衷。上文提到58同城最初的技术选型是Windows，我们在这个阶段做了一次脱胎换骨的技术转型，全面转向开源技术：</p>
+<p>（1）操作系统转型Linux</p>
+<p>（2）数据库转型Mysql</p>
+<p>（3）web服务器转型Tomcat</p>
+<p>（4）开发语言转向了Java</p>
+<p>其实，很多互联网公司在流量从小到大的过程中都经历过类似的转型，例如京东和淘宝。</p>
+<h3 id="反向代理"><a href="#反向代理" class="headerlink" title="反向代理"></a>反向代理</h3><p>为了保证站点的高可用，我们使用了反向代理。</p>
+<p>什么是代理？代理就是代表用户访问xxoo站点。</p>
+<p>什么是反向代理？反向代理代表的是58网站，用户不用关注访问是58同城的哪台服务器，由反向代理来代表58同城。58同城通过反向代理，DNS轮询， LVS等技术，来保证接入层的高可用性。</p>
+<article class="message is-warning" style="font-size:inherit">
+<div class="message-body">
+<img src="/img/nginx-proxy.jpg" alt="不使用LVS"/>
+<br/>
+<img src="/img/lvs-proxy.jpg" alt="LVS反向代理性能比Nginx更好，但也有极限，因此通过DNS轮询来对LVS做负载均衡。"/>
+</div>
+—— 面向问题编程
+</article>
+
+<h3 id="动静分离"><a href="#动静分离" class="headerlink" title="动静分离"></a>动静分离</h3><p>动态的页面通过Web-Server访问，静态的文件例如图片就放到单独的文件服务器上；</p>
+<article class="message is-warning" style="font-size:inherit">
+<div class="message-body">
+Nginx中配置若是js,css,img等静态文件请求，则取文件返回；否则转发给Tomcat处理。
+</div>
+—— 面向问题编程
+</article>
+
+<h3 id="CDN加速"><a href="#CDN加速" class="headerlink" title="CDN加速"></a>CDN加速</h3><p>对静态资源我们使用了CDN服务，用户就近访问，静态资源的访问速度得到很明显的提升；</p>
+<article class="message is-warning" style="font-size:inherit">
+<div class="message-body">
+可能的实现：在CDN厂商那里配置将自己域名CNAME到CDN域名，回源设置Nginx ip.
+<a href="/pages/wiki-cdn/" target="_blank">一文了解CDN加速原理</a>
+</div>
+—— 面向问题编程
+</article>
+
+<h3 id="读写分离"><a href="#读写分离" class="headerlink" title="读写分离"></a>读写分离</h3><p>将落到数据库上的读写请求分派到不同的数据库服务器上；</p>
+<p>互联网绝大部分的业务场景，都是读多写少。对58同城来说，绝大部分用户的需求是访问信息，搜索信息，只有少数的用户发贴。此时读取性能容易成为瓶颈，那么如何扩展整个站点架构的读性能呢？常用的方法是<strong>主从同步</strong>，增加从库。我们原来只有一个读数据库，现在有多个读数据库，就<strong>提高了读性能</strong>。</p>
+<h4 id="分布式一致性问题"><a href="#分布式一致性问题" class="headerlink" title="分布式一致性问题"></a>分布式一致性问题</h4><article class="message is-warning" style="font-size:inherit">
+<div class="message-body">
+在通过将数据复制到多个节点提高读性能和可用性（容忍节点故障）的同时，也带来了分布式一致性的问题。
+</div>
+—— 面向问题编程
+</article>
+
+<p>数据库做了主从同步和读写分离之后，读写库之间数据的同步有一个延时，数据库数据量越大，从库越多时，延时越明显。对应到业务，有用户发帖子，马上去搜索可能搜索不到（着急的用户会再次发布相同的帖子）</p>
+<ul>
+<li>我们在数据库层面也进行了垂直拆分，将单库数据量降下来，让读写延时得到<strong>缓解</strong>。</li>
+</ul>
+<h3 id="按业务拆分服务"><a href="#按业务拆分服务" class="headerlink" title="按业务拆分服务"></a>按业务拆分服务</h3><p><img src="/img/58-arch2-1.png" alt="58同城 业务解耦"></p>
+<p>站点耦合问题：对58同城而言，典型业务场景是：类别聚合的主页，发布信息的发布页，信息聚合的列表页，帖子内容的详细页，原来这些系统都耦合在一个站点中，出现问题的时候，整个系统都会受到影响。</p>
+<p>要解决耦合的问题，最先想到的是针对核心业务做切分，工程师根据业务切分对系统也进行切分：我们将业务垂直拆分成了首页、发布页、列表页和详情页。</p>
+<h3 id="缓存"><a href="#缓存" class="headerlink" title="缓存"></a>缓存</h3><p>随着用户量的增加，对站点可用性要求也越来越高，机器数也从最开始的几台上升到几百台。那么如何提供保证整个系统的可用性呢？首先，我们在业务层做了进一步的垂直拆分，同时引入了Cache，如下图所示：</p>
+<p><img src="/img/58-arch3.png" alt="58同城 RPC"></p>
+<h3 id="RPC"><a href="#RPC" class="headerlink" title="RPC"></a>RPC</h3><p>在架构上，我们抽象了一个相对独立的服务层，所有数据的访问都通过这个服务层统一来管理，上游业务线就像调用本地函数一样，通过<strong>RPC</strong>的框架来调用这个服务获取数据，服务层对上游屏蔽底层数据库与缓存的复杂性。</p>
+<h2 id="参考链接"><a href="#参考链接" class="headerlink" title="参考链接"></a>参考链接</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://www.w3cschool.cn/architectroad/architectroad-58-city-structure-evolution.html">58同城架构演进</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.w3cschool.cn/architectroad/architectroad-dns-polling.html">lvs为何不能完全替代DNS轮询</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>58同城的技术架构</p><p><a href="https://www.heapoverflow.cn/pages/58-arch/">https://www.heapoverflow.cn/pages/58-arch/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>面向问题编程</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2022-03-05</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2022-03-05</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><!--!--><div><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6757924689439593" crossOrigin="anonymous"></script><ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-6757924689439593" data-ad-slot="2352785969"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div></article></div><!--!--><nav class="post-navigation mt-4 level is-mobile"><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/pages/twitter-arch/"><span class="level-item">Twitter的技术架构</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><!--!--><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen  order-3 is-sticky"><div class="card widget" id="toc" data-type="toc"><div class="card-content"><div class="menu"><h3 class="menu-label">目录</h3><ul class="menu-list"><li><a class="level is-mobile" href="#单机系统"><span class="level-left"><span class="level-item">1</span><span class="level-item">单机系统</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#Windows全家桶"><span class="level-left"><span class="level-item">1.1</span><span class="level-item">Windows全家桶</span></span></a></li><li><a class="level is-mobile" href="#LAMP"><span class="level-left"><span class="level-item">1.2</span><span class="level-item">LAMP</span></span></a></li><li><a class="level is-mobile" href="#ORM-更好地CRUD"><span class="level-left"><span class="level-item">1.3</span><span class="level-item">ORM, 更好地CRUD</span></span></a></li></ul></li><li><a class="level is-mobile" href="#分布式系统"><span class="level-left"><span class="level-item">2</span><span class="level-item">分布式系统</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#再见，Windows全家桶"><span class="level-left"><span class="level-item">2.1</span><span class="level-item">再见，Windows全家桶</span></span></a></li><li><a class="level is-mobile" href="#反向代理"><span class="level-left"><span class="level-item">2.2</span><span class="level-item">反向代理</span></span></a></li><li><a class="level is-mobile" href="#动静分离"><span class="level-left"><span class="level-item">2.3</span><span class="level-item">动静分离</span></span></a></li><li><a class="level is-mobile" href="#CDN加速"><span class="level-left"><span class="level-item">2.4</span><span class="level-item">CDN加速</span></span></a></li><li><a class="level is-mobile" href="#读写分离"><span class="level-left"><span class="level-item">2.5</span><span class="level-item">读写分离</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#分布式一致性问题"><span class="level-left"><span class="level-item">2.5.1</span><span class="level-item">分布式一致性问题</span></span></a></li></ul></li><li><a class="level is-mobile" href="#按业务拆分服务"><span class="level-left"><span class="level-item">2.6</span><span class="level-item">按业务拆分服务</span></span></a></li><li><a class="level is-mobile" href="#缓存"><span class="level-left"><span class="level-item">2.7</span><span class="level-item">缓存</span></span></a></li><li><a class="level is-mobile" href="#RPC"><span class="level-left"><span class="level-item">2.8</span><span class="level-item">RPC</span></span></a></li></ul></li><li><a class="level is-mobile" href="#参考链接"><span class="level-left"><span class="level-item">3</span><span class="level-item">参考链接</span></span></a></li></ul></div></div><style>#toc .menu-list > li > a.is-active + .menu-list { display: block; }#toc .menu-list > li > a + .menu-list { display: none; }</style><script src="/js/toc.js" defer></script></div><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg"></figure><p class="is-size-6 is-block">公众号：面向问题编程</p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives"><p class="title">7</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories"><p class="title">4</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags"><p class="title">3</p></a></div></div></nav></div></div><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/"><span class="level-start"><span class="level-item">一文了解</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/"><span class="level-start"><span class="level-item">技术架构</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BB%BC%E8%BF%B0/"><span class="level-start"><span class="level-item">综述</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E9%97%AE%E9%A2%98/"><span class="level-start"><span class="level-item">问题</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li></ul></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a><p class="is-size-7"><span>&copy; 2022 面向问题编程</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-CN");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script type="text/x-mathjax-config">MathJax.Hub.Config({
+            'HTML-CSS': {
+                matchFontHeight: false
+            },
+            SVG: {
+                matchFontHeight: false
+            },
+            CommonHTML: {
+                matchFontHeight: false
+            },
+            tex2jax: {
+                inlineMath: [
+                    ['$','$'],
+                    ['\\(','\\)']
+                ]
+            }
+        });</script><script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.9/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script><!--!--><!--!--><!--!--><script src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script src="/js/insight.js" defer></script><script>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script></body></html>
