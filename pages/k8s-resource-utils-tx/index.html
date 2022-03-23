@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><title>腾讯：如何提升Kubernetes集群资源利用率 - 面向问题编程</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="面向问题编程"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="面向问题编程"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="王孝威，腾讯云容器产品经理，热衷于为客户提供高效的 Kubernetes 使用方式，为客户极致降本增效服务。   晏子怡，腾讯云容器产品经理，在Kubernetes 弹性伸缩、资源高效利用领域有丰富的实战经验。 背景公有云的发展为业务的稳定性、可拓展性、便利性带来了极大帮助。这种用租代替买、并且提供完善的技术支持和保障的服务，理应为业务带来降本增效的效果。但实际上业务上云并不意味着成本一定减少，还"><meta property="og:type" content="blog"><meta property="og:title" content="腾讯：如何提升Kubernetes集群资源利用率"><meta property="og:url" content="https://www.heapoverflow.cn/pages/k8s-resource-utils-tx/"><meta property="og:site_name" content="面向问题编程"><meta property="og:description" content="王孝威，腾讯云容器产品经理，热衷于为客户提供高效的 Kubernetes 使用方式，为客户极致降本增效服务。   晏子怡，腾讯云容器产品经理，在Kubernetes 弹性伸缩、资源高效利用领域有丰富的实战经验。 背景公有云的发展为业务的稳定性、可拓展性、便利性带来了极大帮助。这种用租代替买、并且提供完善的技术支持和保障的服务，理应为业务带来降本增效的效果。但实际上业务上云并不意味着成本一定减少，还"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://www.heapoverflow.cn/img/k8s-resource-utils-tx/3.jpg"><meta property="article:published_time" content="2022-03-23T14:35:26.137Z"><meta property="article:modified_time" content="2022-03-23T15:05:06.827Z"><meta property="article:author" content="面向问题编程"><meta property="article:tag" content="离在线混部"><meta property="article:tag" content="Kubernetes"><meta property="twitter:card" content="summary"><meta property="twitter:image" content="/img/k8s-resource-utils-tx/3.jpg"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.heapoverflow.cn/pages/k8s-resource-utils-tx/"},"headline":"腾讯：如何提升Kubernetes集群资源利用率","image":["https://www.heapoverflow.cn/img/k8s-resource-utils-tx/3.jpg"],"datePublished":"2022-03-23T14:35:26.137Z","dateModified":"2022-03-23T15:05:06.827Z","author":{"@type":"Person","name":"面向问题编程"},"publisher":{"@type":"Organization","name":"面向问题编程","logo":{"@type":"ImageObject","url":"https://www.heapoverflow.cn/img/logo.svg"}},"description":"王孝威，腾讯云容器产品经理，热衷于为客户提供高效的 Kubernetes 使用方式，为客户极致降本增效服务。   晏子怡，腾讯云容器产品经理，在Kubernetes 弹性伸缩、资源高效利用领域有丰富的实战经验。 背景公有云的发展为业务的稳定性、可拓展性、便利性带来了极大帮助。这种用租代替买、并且提供完善的技术支持和保障的服务，理应为业务带来降本增效的效果。但实际上业务上云并不意味着成本一定减少，还"}</script><link rel="canonical" href="https://www.heapoverflow.cn/pages/k8s-resource-utils-tx/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><script src="https://www.googletagmanager.com/gtag/js?id=G-ETGL163DQH" async></script><script>window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    
+        gtag('config', 'G-ETGL163DQH');</script><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><script data-ad-client="ca-pub-6757924689439593" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+          Array
+              .from(document.querySelectorAll('.tab-content'))
+              .forEach($tab => {
+                  $tab.classList.add('is-hidden');
+              });
+          Array
+              .from(document.querySelectorAll('.tabs li'))
+              .forEach($tab => {
+                  $tab.classList.remove('is-active');
+              });
+          const $activeTab = document.querySelector(location.hash);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+          const $tabMenu = document.querySelector(`a[href="${location.hash}"]`);
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 6.0.0"></head><body class="is-2-column"><nav class="navbar navbar-main"><div class="container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/categories/%E9%97%AE%E9%A2%98/">问题</a><a class="navbar-item" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/">技术架构</a><a class="navbar-item" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="分类" href="/categories">分类</a><a class="navbar-item" target="_blank" rel="noopener" title="标签" href="/tags">标签</a><a class="navbar-item" target="_blank" rel="noopener" title="归档" href="/archives">归档</a><a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;"><i class="fas fa-list-ul"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-9-widescreen"><div class="card"><div class="card-image"><span class="image is-7by3"><img class="fill" src="/img/k8s-resource-utils-tx/3.jpg" alt="腾讯：如何提升Kubernetes集群资源利用率"></span></div><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-03-23T14:35:26.137Z" title="2022/3/23 下午10:35:26">2022-03-23</time>发表</span><span class="level-item"><time dateTime="2022-03-23T15:05:06.827Z" title="2022/3/23 下午11:05:06">2022-03-23</time>更新</span><span class="level-item">43 分钟读完 (大约6463个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">腾讯：如何提升Kubernetes集群资源利用率</h1><div class="content"><p>王孝威，腾讯云容器产品经理，热衷于为客户提供高效的 Kubernetes 使用方式，为客户极致降本增效服务。  </p>
+<p>晏子怡，腾讯云容器产品经理，在Kubernetes 弹性伸缩、资源高效利用领域有丰富的实战经验。</p>
+<h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>公有云的发展为业务的稳定性、可拓展性、便利性带来了极大帮助。这种用租代替买、并且提供完善的技术支持和保障的服务，理应为业务带来降本增效的效果。但实际上业务上云并不意味着成本一定减少，还需适配云上业务的应用开发、架构设计、管理运维、合理使用等多方面解决方案，才能真正助力业务的降本增效。在《Kubernetes 降本增效标准指南》系列的上一篇文章<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s?__biz=Mzg5NjA1MjkxNw==&mid=2247495659&idx=1&sn=d55f1183d7d4a4c0ec5dd3340aa78bf3&scene=21#wechat_redirect">《容器化计算资源利用率现象剖析》</a>中可看到，IDC 上云后资源利用率提高有限，即使已经容器化，节点的平均利用率依旧仅在 13% 左右，资源利用率的提升任重道远。</p>
+<p>本篇文章将带你了解：为什么 Kubernetes 集群中的 <strong>CPU 和内存资源利用率</strong> 通常都如此之低？现阶段在 TKE 上面有哪些产品化的方法可以轻松提升资源利用率？</p>
+<span id="more"></span>
+
+<h2 id="资源浪费场景"><a href="#资源浪费场景" class="headerlink" title="资源浪费场景"></a>资源浪费场景</h2><p>为何资源利用率通常都如此之低？首先可以看看几个业务的实际使用资源场景：</p>
+<h3 id="资源预留普遍存在-50-以上的浪费"><a href="#资源预留普遍存在-50-以上的浪费" class="headerlink" title="资源预留普遍存在 50% 以上的浪费"></a>资源预留普遍存在 50% 以上的浪费</h3><p>Kubernetes 中的 Request(请求) 字段用于管理容器对 CPU 和内存资源预留，保证容器至少可以达到的资源量，该部分资源不能被其他容器抢占，具体可查看[1]。当 Request 设置过小，无法保证业务的资源量，当业务的负载变高时无力承载，因此用户通常习惯将 Request 设置得很高，以保证服务的可靠性。但实际上，业务在大多数时段时负载不会很高。以 CPU 为例，下图是某个实际业务场景下容器的资源预留（Request）和实际使用量（CPU_Usage）关系图：资源预留远大于实际使用量，两者之间差值所对应的资源不能被其他负载使用，因此 Request 设置过大势必会造成较大的资源浪费。<img src="/img/k8s-resource-utils-tx/0.jpg"></p>
+<blockquote>
+<p>如何解决这样的问题？现阶段需要用户自己根据实际的负载情况设置更合理的 Request、以及限制业务对资源的无限请求，防止资源被某些业务过度占用。这里可以参考后文中的 <strong>Request Quota</strong> 和 <strong>Limit Ranges</strong> 的设置。</p>
+<p>此外，TKE 将推出 <strong>Request 推荐产品</strong>，帮助用户智能缩小 Request 和 Usage 之间的差值，在保障业务的稳定性的情况下有效提升资源利用率。</p>
+</blockquote>
+<h3 id="业务资源波峰波谷现象普遍"><a href="#业务资源波峰波谷现象普遍" class="headerlink" title="业务资源波峰波谷现象普遍"></a>业务资源波峰波谷现象普遍</h3><p><strong>通常波谷时间大于波峰时间，资源浪费明显。</strong></p>
+<p>大多数业务存在波峰波谷，例如公交系统通常在白天负载增加，夜晚负载减少；游戏业务通常在周五晚上开始出现波峰，在周日晚开始出现波谷。</p>
+<p>如下图所示：同一业务在不同的时间段对资源的请求量不同，如果用户设置的是固定的 Request，业务在负载较低时利用率很低。</p>
+<p><img src="/img/k8s-resource-utils-tx/1.jpg"></p>
+<blockquote>
+<p>这时可以通过动态调整副本数，以高资源利用率承载业务的波峰波谷，可以参考后文中的 <strong>HPA 、HPC、CA。</strong></p>
+</blockquote>
+<h3 id="不同类型的业务，对资源的需求不同"><a href="#不同类型的业务，对资源的需求不同" class="headerlink" title="不同类型的业务，对资源的需求不同"></a>不同类型的业务，对资源的需求不同</h3><p>在线业务通常白天负载较高，对时延要求较高，必须优先调度和运行；而离线的计算型业务通常对运行时段和时延要求相对较低，理论上可以在在线业务波谷时运行。此外，有些业务属于计算密集型，对 CPU 资源消耗较多，而有些业务属于内存密集型，对内存消耗较多。</p>
+<p><img src="/img/k8s-resource-utils-tx/2.jpg"></p>
+<blockquote>
+<p>如上图所示，通过在离线混部可以动态调度离线业务和在线业务，让不同类型业务在不同的时间段运行以提升资源利用率。对于计算密集型业务和内存密集型业务，可以使用亲和性调度，为业务分配更合适的节点，有效提升资源利用率。具体方式可参考后文中的<strong>在离线混部</strong>和<strong>亲和性调度</strong>。</p>
+</blockquote>
+<h2 id="在-Kubernetes-上提升资源利用率的方法"><a href="#在-Kubernetes-上提升资源利用率的方法" class="headerlink" title="在 Kubernetes 上提升资源利用率的方法"></a>在 Kubernetes 上提升资源利用率的方法</h2><p>腾讯云容器服务 TKE 基于大量的用户实际业务，已经产品化了一系列工具，帮助用户轻松有效的提升资源利用率。主要从两方面着手：一是利用原生的 Kubernetes 能力手动进行资源的划分和限制；二是结合业务特性的自动化方案。<img src="/img/k8s-resource-utils-tx/3.jpg"></p>
+<h3 id="1-如何资源划分和限制"><a href="#1-如何资源划分和限制" class="headerlink" title="1. 如何资源划分和限制"></a>1. 如何资源划分和限制</h3><blockquote>
+<p>设想，你是个集群管理员，现在有4个业务部门使用同一个集群，你的责任是保证业务稳定性的前提下，让业务真正做到资源的按需使用。为了有效提升集群整体的资源利用率，这时就需要限制各业务使用资源的上限，以及通过一些默认值防止业务过量使用。</p>
+</blockquote>
+<p>理想情况下，业务应该根据实际情况，设置合理的 Request 和 Limit。（Request 用于对资源的占位，表示容器至少可以获得的资源；Limit 用于对资源的限制，表示容器至多可以获得的资源。）这样更利于容器的健康运行、资源的充分使用。但实际上用户经常忘记设置容器对资源的 Request 和 Limit。此外，对于共享使用一个集群的团队&#x2F;项目来说，他们通常都将自己容器的 Request 和 Limit 设置得很高以保证自己服务的稳定性。如果你使用的是 TKE 的控制台，创建负载时会给所有的容器设置如下默认值。该默认值是 TKE 根据真实业务分析预估得出，和具体的业务需求之间可能存在偏差。</p>
+<table>
+<thead>
+<tr>
+<th align="center"></th>
+<th align="center">Request</th>
+<th align="center">Limit</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">CPU(核)</td>
+<td align="center">0.25</td>
+<td align="center">0.5</td>
+</tr>
+<tr>
+<td align="center">Memory(MiB)</td>
+<td align="center">256</td>
+<td align="center">1024</td>
+</tr>
+</tbody></table>
+<p><strong>为了更细粒度的划分和管理资源，可以在 TKE 上设置命名空间级别的 Resource Quota 以及 Limit Ranges。</strong></p>
+<h4 id="1-1-使用-Resource-Quota-划分资源"><a href="#1-1-使用-Resource-Quota-划分资源" class="headerlink" title="1.1 使用 Resource Quota 划分资源"></a>1.1 使用 Resource Quota 划分资源</h4><blockquote>
+<p>如果你管理的某个集群有4个业务，为了实现业务间的隔离和资源的限制，你可以使用命名空间和 Resource Quota</p>
+</blockquote>
+<p>Resource Quota 用于设置命名空间资源的使用配额，命名空间是 Kubernetes 集群里面的一个隔离分区，一个集群里面通常包含多个命名空间，例如 Kubernetes 用户通常会将不同的业务放在不同的命名空间里，你可以为不同的命名空间设置不同的 Resource Quota，以限制一个命名空间对集群整体资源的使用量，达到预分配和限制的效果。Resource Quota 主要作用于如下方面，具体可查看[2]。</p>
+<ol>
+<li><p>计算资源：所有容器对 CPU 和 内存的 Request 以及 Limit 的总和</p>
+</li>
+<li><p>存储资源：所有 PVC 的存储资源请求总和</p>
+</li>
+<li><p>对象数量：PVC&#x2F;Service&#x2F;Configmap&#x2F;Deployment等资源对象数量的总和</p>
+</li>
+</ol>
+<h5 id="Resource-Quota-使用场景"><a href="#Resource-Quota-使用场景" class="headerlink" title="Resource Quota 使用场景"></a>Resource Quota 使用场景</h5><ul>
+<li>给不同的项目&#x2F;团队&#x2F;业务分配不同的命名空间，通过设置每个命名空间资源的 Resource Quota 以达到资源分配的目的</li>
+<li>设置一个命名空间的资源使用数量的上限以提高集群的稳定性，防止一个命名空间对资源的多度侵占和消耗</li>
+</ul>
+<h5 id="TKE-上的-Resource-Quota"><a href="#TKE-上的-Resource-Quota" class="headerlink" title="TKE 上的 Resource Quota"></a>TKE 上的 Resource Quota</h5><p>TKE 上已经实现对 Resource Quota 的产品化，你可以直接在控制台利用 Resource Quota 限制一个命名空间的资源使用量，具体可参考文档[3]。<img src="/img/k8s-resource-utils-tx/4.jpg"><img src="/img/k8s-resource-utils-tx/5.jpg"></p>
+<h4 id="1-2-使用-Limit-Ranges-限制资源"><a href="#1-2-使用-Limit-Ranges-限制资源" class="headerlink" title="1.2 使用 Limit Ranges 限制资源"></a>1.2 使用 Limit Ranges 限制资源</h4><blockquote>
+<p>用户经常忘记设置资源的 Request 和 Limit，或者将值设置得很大怎么办？作为管理员，如果可以为不同的业务设置不同资源使用默认值以及范围，可以有效减少业务创建时的工作量同时，限制业务对资源的过度侵占。</p>
+</blockquote>
+<p>与 Resource Quota 对命名空间整体的资源限制不同，Limit Ranges 适用于一个命名空间下的单个容器。可以防止用户在命名空间内创建对资源申请过小或过大容器，防止用户忘记设置容器的 Request 和 Limit。Limit Ranges 主要作用于如下方面，具体可查看[4]。</p>
+<ol>
+<li><p>计算资源：对所有容器设置 CPU 和内存使用量的范围</p>
+</li>
+<li><p>存储资源：对所有 PVC 能申请的存储空间的范围</p>
+</li>
+<li><p>比例设置：控制一种资源 Request 和 Limit 之间比例</p>
+</li>
+<li><p>默认值：对所有容器设置默认的 Request&#x2F;Limit，如果容器未指定自己的内存请求和限制，将为它指定默认的内存请求和限制</p>
+</li>
+</ol>
+<h5 id="Limit-Ranges-使用场景"><a href="#Limit-Ranges-使用场景" class="headerlink" title="Limit Ranges 使用场景"></a>Limit Ranges 使用场景</h5><ol>
+<li><p>设置资源使用默认值，以防用户遗忘，也可以避免 QoS[5] 驱逐重要的 Pod</p>
+</li>
+<li><p>不同的业务通常运行在不同的命名空间里，不同的业务通常资源使用情况不同，为不同的命名空间设置不同的 Request&#x2F;Limit 可以提升资源利用率</p>
+</li>
+<li><p>限制容器对资源使用的上下限，保证容器正常运行的情况下，限制其请求过多资源</p>
+</li>
+</ol>
+<h5 id="TKE-上的-Limit-Ranges"><a href="#TKE-上的-Limit-Ranges" class="headerlink" title="TKE 上的 Limit Ranges"></a>TKE 上的 Limit Ranges</h5><p>TKE 上已经实现对 Limit Ranges 的产品化，你可以直接在控制台管理命名空间的 Limit Ranges，具体可参考文档[6]。<img src="/img/k8s-resource-utils-tx/6.jpg"></p>
+<h3 id="2-自动化提升资源利用率的方法"><a href="#2-自动化提升资源利用率的方法" class="headerlink" title="2. 自动化提升资源利用率的方法"></a>2. 自动化提升资源利用率的方法</h3><p>上面提到的利用 Resource Quota 和 Limit Ranges 来分配和限制资源的方法依赖经验和手工，主要解决的是资源请求和分配不合理。如何更自动化的动态调整以提升资源利用率是用户更关心的问题，接下来从弹性伸缩、调度、在离线混部三大产品化的方向，详述如何提升资源利用率。</p>
+<h4 id="2-1-弹性伸缩"><a href="#2-1-弹性伸缩" class="headerlink" title="2.1 弹性伸缩"></a>2.1 弹性伸缩</h4><h5 id="2-1-1-通过-HPA-按指标弹性扩缩容"><a href="#2-1-1-通过-HPA-按指标弹性扩缩容" class="headerlink" title="2.1.1 通过 HPA 按指标弹性扩缩容"></a>2.1.1 通过 HPA 按指标弹性扩缩容</h5><blockquote>
+<p>如上面资源浪费场景2所说，如果你的业务是存在波峰波谷的，固定的资源 Request 注定在波谷时会造成资源浪费，针对这样的场景，如果波峰的时候可以自动增加业务负载的副本数量，波谷的时候可以自动减少业务负载的副本数量，将有效提升资源整体利用率。</p>
+</blockquote>
+<p>HPA（Horizontal Pod Autoscaler）可以基于一些指标（例如 CPU、内存的利用率）自动扩缩 Deployment 和 StatefulSet 中的 Pod 副本的数量，达到工作负载稳定的目的，真正做到按需使用。</p>
+<h5 id="1、HPA-使用场景"><a href="#1、HPA-使用场景" class="headerlink" title="1、HPA 使用场景"></a>1、HPA 使用场景</h5><ol>
+<li><p>流量突发：突然流量增加，负载过载时会自动增加 Pod 数量以及时响应</p>
+</li>
+<li><p>自动缩容：流量较少时，负载对资源的利用率过低时会自动减少 Pod 的数量以避免浪费</p>
+</li>
+</ol>
+<h5 id="2、TKE-上的-HPA"><a href="#2、TKE-上的-HPA" class="headerlink" title="2、TKE 上的 HPA"></a>2、TKE 上的 HPA</h5><p>TKE 基于 Custom Metrics API 支持许多用于弹性伸缩的指标，涵盖 CPU、内存、硬盘、网络以及 GPU 相关的指标，覆盖绝大多数的 HPA 弹性伸缩场景，详细列表请参见 自动伸缩指标说明。此外，针对例如基于业务单副本 QPS 大小来进行自动扩缩容等复杂场景，可通过安装 prometheus-adapter 来实现自动扩缩容，具体可参考文档[7]。<img src="/img/k8s-resource-utils-tx/7.jpg"></p>
+<h5 id="2-1-2-通过-HPC-定时扩缩容"><a href="#2-1-2-通过-HPC-定时扩缩容" class="headerlink" title="2.1.2 通过 HPC 定时扩缩容"></a>2.1.2 通过 HPC 定时扩缩容</h5><blockquote>
+<p>假设你的业务是电商平台，双十一要进行促销活动，这时可以考虑使用 HPA 自动扩缩容。但是 HPA 需要先监控各项指标后，再进行反应，可能扩容速度不够快，无法及时承载高流量。针对这种有预期的流量暴增，如果能提前发生副本扩容，将有效承载流量井喷。</p>
+</blockquote>
+<p>HPC（HorizontalPodCronscaler）是 TKE 自研组件，旨在定时控制副本数量，以达到提前扩缩容、和提前触发动态扩容时资源不足的影响，相较社区的 CronHPA，额外支持：</p>
+<ol>
+<li>与 HPA 结合：可以实现定时开启和关闭 HPA，让你的业务在高峰时更弹性</li>
+<li>例外日期设置：业务的流量不太可能永远都是规律的，设置例外日期可以减少手工调整 HPC</li>
+<li>单次执行：以往的 CronHPA 都是永久执行，类似 Cronjob，单次执行可以更灵活的应对大促场景。</li>
+</ol>
+<p>1、HPC使用场景</p>
+<p>以游戏服务为例，从周五晚上到周日晚上，游戏玩家数量暴增。如果可以将游戏服务器在星期五晚上前扩大规模，并在星期日晚上后缩放为原始规模，则可以为玩家提供更好的体验。如果使用 HPA，可能因为扩容速度不够快导致服务受影响。</p>
+<p><strong>2、TKE上的HPC</strong></p>
+<p>TKE 上已经实现对 HPC 的产品化，但你需要提前在”组件管理“里面安装 HPC，HPC 使用 CronTab 语法格式。</p>
+<p>安装：<img src="/img/k8s-resource-utils-tx/8.jpg"></p>
+<p>使用：<img src="/img/k8s-resource-utils-tx/8.jpg"><img src="/img/k8s-resource-utils-tx/10.jpg"></p>
+<h5 id="2-1-3-通过-CA-自动调整节点数量"><a href="#2-1-3-通过-CA-自动调整节点数量" class="headerlink" title="2.1.3 通过 CA 自动调整节点数量"></a>2.1.3 通过 CA 自动调整节点数量</h5><blockquote>
+<p>上面提到的 HPA 和 HPC，都是在业务负载层面的自动扩缩副本数量，以灵活应对流量的波峰波谷，提升资源利用率。但是对于集群整体而言，资源总数是固定的，HPA 和 HPC 只是让集群有更多空余的资源，是否有一种方法，能在集群整体较“空”时回收部分资源，能在集群整体较“满”时扩充集群整体资源？因为集群整体资源的使用量直接决定了账单费用，这种集群级别的弹性扩缩将真正节省使用成本。</p>
+</blockquote>
+<p>CA（Cluster Autoscaler）用于自动扩缩集群节点数量，以真正实现资源利用率的提升，并直接作用于用户的费用，是降本增效的关键。</p>
+<h5 id="1、CA-使用场景"><a href="#1、CA-使用场景" class="headerlink" title="1、CA 使用场景"></a>1、CA 使用场景</h5><ol>
+<li><p>在业务波峰时，根据业务突增的负载扩容合适的节点</p>
+</li>
+<li><p>在业务波谷时，根据资源的空闲情况释放多余的节点</p>
+</li>
+</ol>
+<h5 id="2、TKE-上的-CA"><a href="#2、TKE-上的-CA" class="headerlink" title="2、TKE 上的 CA"></a>2、TKE 上的 CA</h5><p>TKE 上的 CA 是以节点池的形态来让用户使用的，CA 推荐和 HPA 一起使用：HPA 负责应用层的扩缩容，CA 负责资源层（节点层）的扩缩容，当 HPA 扩容造成集群整体资源不足时，会引发 Pod 的 Pending，Pod Pending 会触发 CA 扩充节点池以增加集群整体资源量，整体扩容逻辑可参考下图：</p>
+<p><img src="/img/k8s-resource-utils-tx/11.jpg">具体的参数配置方式以及应用场景可参考<a target="_blank" rel="noopener" href="http://mp.weixin.qq.com/s?__biz=Mzg5NjA1MjkxNw==&mid=2247490235&idx=1&sn=cd23ada06ee77162e9b7c7df4f0f2169&chksm=c007a161f77028771e0b98cf77f405d01b4576f89c17fa2794c19f0635b48680ecb5ca88ff86&scene=21#wechat_redirect">《像管理 Pod 一样管理 Node》</a>。</p>
+<h4 id="2-2-调度"><a href="#2-2-调度" class="headerlink" title="2.2 调度"></a>2.2 调度</h4><p>Kubernetes 调度机制是 Kubernetes 原生提供的一种高效优雅的资源分配机制，它的核心功能是为每个 Pod 找到最适合它的节点，在 TKE 场景下，调度机制帮助实现了应用层弹性伸缩到资源层弹性伸缩的过渡。通过合理利用 Kubernetes 提供的调度能力，根据业务特性配置合理的调度策略，也能有效提高集群中的资源利用率。</p>
+<h5 id="2-2-1-节点亲和性"><a href="#2-2-1-节点亲和性" class="headerlink" title="2.2.1 节点亲和性"></a>2.2.1 节点亲和性</h5><blockquote>
+<p>倘若你的某个业务是 CPU 密集型，不小心被 Kubernetes 的调度器调度到内存密集型的节点上，导致内存密集型的 CPU 被占满，但内存几乎没怎么用，会造成较大的资源浪费。如果你能为节点设置一个标记，表明这是一个 CPU 密集型的节点，然后在创建业务负载时也设置一个标记，表明这个负载是一个 CPU 密集型的负载，Kubernetes 的调度器会将这个负载调度到 CPU 密集型的节点上，这种寻找最合适的节点的方式，将有效提升资源利用率。</p>
+</blockquote>
+<p>创建 Pod 时，可以设置节点亲和性，即指定 Pod 想要调度到哪些节点上（这些节点是通过 K8s Label）来指定的。</p>
+<h5 id="1、节点亲和性使用场景"><a href="#1、节点亲和性使用场景" class="headerlink" title="1、节点亲和性使用场景"></a>1、节点亲和性使用场景</h5><p>节点亲和性非常适合在一个集群中有不同资源需求的工作负载同时运行的场景。比如说，腾讯云的 CVM（节点） 有 CPU 密集型的机器，也有内存密集型的机器。如果某些业务对 CPU 的需求远大于内存，此时使用普通的 CVM 机器，势必会对内存造成较大浪费。此时可以在集群里添加一批 CPU 密集型的 CVM，并且把这些对 CPU 有较高需求的 Pod 调度到这些 CVM 上，这样可以提升 CVM 资源的整体利用率。同理，还可以在集群中管理异构节点（比如 GPU 机器），在需要 GPU 资源的工作负载中指定需要GPU资源的量，调度机制则会帮助你寻找合适的节点去运行这些工作负载。</p>
+<h5 id="TKE-上的节点亲和性"><a href="#TKE-上的节点亲和性" class="headerlink" title="TKE 上的节点亲和性"></a>TKE 上的节点亲和性</h5><p>TKE 提供与原生 Kubernetes 完全一致的亲和性使用方式，你可通过控制台或配置 YAML 的方式使用此项功能，具体可参考[8]。</p>
+<h5 id="2-2-2-动态调度器"><a href="#2-2-2-动态调度器" class="headerlink" title="2.2.2 动态调度器"></a>2.2.2 动态调度器</h5><blockquote>
+<p>原生的 Kubernetes 调度策略倾向于调度 Pod 到节点剩余资源较多的节点上， 比如默认的 LeastRequestedPriority 策略。但是原生调度策略存在一个问题：这样的资源分配是静态的，Request 不能代表资源真实使用情况，因此一定会存在一定程度的浪费。因此，如果调度器可以基于节点的实际资源利用率进行调度，将一定程度上解决资源浪费的问题。</p>
+</blockquote>
+<p>TKE 自研的动态调度器所做的就是这样的工作。动态调度器的核心原理如下：</p>
+<p><img src="/img/k8s-resource-utils-tx/12.jpg"></p>
+<h5 id="1、动态调度器的使用场景"><a href="#1、动态调度器的使用场景" class="headerlink" title="1、动态调度器的使用场景"></a>1、动态调度器的使用场景</h5><p>除了降低资源浪费，动态调度器还可以很好的缓解集群调度热点的问题。</p>
+<ul>
+<li><p>动态调度器会统计过去一段时间调度到节点的 Pod 数目，避免往同一节点上调度过多的 Pod</p>
+</li>
+<li><p>动态调度器支持设置节点负载阈值，在调度阶段过滤掉超过阈值的节点。</p>
+</li>
+</ul>
+<h5 id="2、TKE-上的动态调度器"><a href="#2、TKE-上的动态调度器" class="headerlink" title="2、TKE 上的动态调度器"></a>2、TKE 上的动态调度器</h5><p>你可以在扩展组件里面安装和使用动态调度器：<img src="/img/k8s-resource-utils-tx/13.jpg">更多关于动态调度器的使用指南，可以参考 <a target="_blank" rel="noopener" href="http://mp.weixin.qq.com/s?__biz=Mzg5NjA1MjkxNw==&mid=2247491191&idx=1&sn=0c0ce0eafdf1e90abf8ed69ad0a2699d&chksm=c007a5adf7702cbbca515cf99b42f49a13c4bb2a5c864de9fa6a5ffc0e6c1756f73db4e9ca97&scene=21#wechat_redirect">《TKE 重磅推出全链路调度解决方案》</a>。</p>
+<h4 id="2-3-在离线业务混部"><a href="#2-3-在离线业务混部" class="headerlink" title="2.3 在离线业务混部"></a>2.3 在离线业务混部</h4><blockquote>
+<p>如果你既有在线 Web 服务业务，又有离线的计算服务业务，借助 TKE 的在离线业务混部技术可以动态调度和运行不同的业务，提升资源利用率。</p>
+</blockquote>
+<p>在传统架构中，大数据业务和在线业务往往部署在不同的资源集群中，这两部分业务相互独立。但大数据业务一般更多的是离线计算类业务，在夜间处于业务高峰，而在线业务恰恰相反夜间常常处于空载状态。云原生技术借助容器完整(CPU，内存，磁盘IO，网络IO等)的隔离能力，及 Kubernetes 强大的编排调度能力，实现在线和离线业务混合部署，从而使在离线业务充分利用在线业务空闲时段的资源，以提高资源利用率。</p>
+<h5 id="在离线业务混部使用场景"><a href="#在离线业务混部使用场景" class="headerlink" title="在离线业务混部使用场景"></a>在离线业务混部使用场景</h5><p>在 Hadoop 架构下，离线作业和在线作业往往分属不同的集群，然而在线业务、流式作业具有明显的波峰波谷特性，在波谷时段，会有大量的资源处于闲置状态，造成资源的浪费和成本的提升。在离线混部集群，通过动态调度削峰填谷，当在线集群的使用率处于波谷时段，将离线任务调度到在线集群，可以显著的提高资源的利用率。然而，Hadoop Yarn 目前只能通过 NodeManager 上报的静态资源情况进行分配，无法基于动态资源调度，无法很好的支持在线、离线业务混部的场景。</p>
+<h5 id="TKE-上的在离线混部"><a href="#TKE-上的在离线混部" class="headerlink" title="TKE 上的在离线混部"></a>TKE 上的在离线混部</h5><p>在线业务具有明显的波峰浪谷特征，而且规律比较明显，尤其是在夜间，资源利用率比较低，这时候大数据管控平台向 Kubernetes 集群下发创建资源的请求，可以提高大数据应用的算力，具体可<a target="_blank" rel="noopener" href="http://mp.weixin.qq.com/s?__biz=Mzg5NjA1MjkxNw==&mid=2247488081&idx=1&sn=9ebcbfa52ddb0a7b17feee58b23d3da4&chksm=c007a98bf770209d92a27500c93ddf84915919a0501e0c1e04a87694c32e2cbe8020cf09df06&scene=21#wechat_redirect"><strong>参考</strong></a>。</p>
+<p><img src="/img/k8s-resource-utils-tx/14.jpg"></p>
+<h2 id="如何权衡资源利用率与稳定性"><a href="#如何权衡资源利用率与稳定性" class="headerlink" title="如何权衡资源利用率与稳定性"></a>如何权衡资源利用率与稳定性</h2><p>在企业的运维工作中，除了成本，系统的稳定性也是十分重要的指标。如何在两者间达到平衡，可能是很多运维人员心中的“痛点”。一方面，为了降低成本，资源利用率当然是越高越好，但是资源利用率达到一定水位后，负载过高极有可能导致业务 OOM 或 CPU 抖动等问题。为了减小企业成本控制之路上的顾虑，TKE 还提供了“兜底神器“ - <strong>重调度器</strong> 来保障集群负载水位在可控范围内。重调度器是动态调度器是一对好搭档（它们的关系可以参考下图），就像它的名字一样，它主要负责“保护”节点中已经负载比较“危险”的节点， 优雅驱逐这些节点上的业务。</p>
+<p><img src="/img/k8s-resource-utils-tx/15.jpg"></p>
+<h3 id="TKE-上的重调度器"><a href="#TKE-上的重调度器" class="headerlink" title="TKE 上的重调度器"></a>TKE 上的重调度器</h3><p>可以在扩展组件里面安装和使用重调度器：<img src="/img/k8s-resource-utils-tx/16.jpg"></p>
+<p>更多关于重调度器的使用指南，可以参考 <a target="_blank" rel="noopener" href="http://mp.weixin.qq.com/s?__biz=Mzg5NjA1MjkxNw==&mid=2247491191&idx=1&sn=0c0ce0eafdf1e90abf8ed69ad0a2699d&chksm=c007a5adf7702cbbca515cf99b42f49a13c4bb2a5c864de9fa6a5ffc0e6c1756f73db4e9ca97&scene=21#wechat_redirect"><strong>《TKE 重磅推出全链路调度解决方案》</strong></a> 。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>资源利用率的提升道阻且长，如何在保障业务稳定性的前提下，有效提升资源利用率具有较大挑战。利用上述这些 TKE 的产品化方案，可以有效帮助用户解决资源利用率提升过程中的种种挑战，此外 TKE 也在开发其他的工具帮助用户降低提升资源利用率的门槛。《Kubernetes 降本增效标准指南》系列后期文章将更加深入讲解 Kubernetes 提升资源利用率的方法，敬请期待。</p>
+<article class="message message-immersive is-primary">
+<div class="message-body">
+<i class="fas fa-globe-asia mr-2"></i>本文来自
+<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s?__biz=Mzg5NjA1MjkxNw==&mid=2247501386&idx=1&sn=61ec920e8e5da9fad2c8cbc69abeb023&chksm=c0047d90f773f4864ab6168621309a62d08efa5dac9b7986f0eee2521590fcadc4d22d210130&scene=178&cur_album_id=1842737651653623813#rd">腾讯云原生</a>.
+</div>
+</article>
+ </div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E7%A6%BB%E5%9C%A8%E7%BA%BF%E6%B7%B7%E9%83%A8/">离在线混部</a><a class="link-muted mr-2" rel="tag" href="/tags/Kubernetes/">Kubernetes</a></div><!--!--><div><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6757924689439593" crossOrigin="anonymous"></script><ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-6757924689439593" data-ad-slot="2352785969"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div></article></div><!--!--><nav class="post-navigation mt-4 level is-mobile"><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/pages/hybrid-deploy-bytedance/"><span class="level-item">字节跳动：自动化弹性伸缩如何支持百万级核心错峰混部</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><!--!--><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen  order-3 is-sticky"><div class="card widget" id="toc" data-type="toc"><div class="card-content"><div class="menu"><h3 class="menu-label">目录</h3><ul class="menu-list"><li><a class="level is-mobile" href="#背景"><span class="level-left"><span class="level-item">1</span><span class="level-item">背景</span></span></a></li><li><a class="level is-mobile" href="#资源浪费场景"><span class="level-left"><span class="level-item">2</span><span class="level-item">资源浪费场景</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#资源预留普遍存在-50-以上的浪费"><span class="level-left"><span class="level-item">2.1</span><span class="level-item">资源预留普遍存在 50% 以上的浪费</span></span></a></li><li><a class="level is-mobile" href="#业务资源波峰波谷现象普遍"><span class="level-left"><span class="level-item">2.2</span><span class="level-item">业务资源波峰波谷现象普遍</span></span></a></li><li><a class="level is-mobile" href="#不同类型的业务，对资源的需求不同"><span class="level-left"><span class="level-item">2.3</span><span class="level-item">不同类型的业务，对资源的需求不同</span></span></a></li></ul></li><li><a class="level is-mobile" href="#在-Kubernetes-上提升资源利用率的方法"><span class="level-left"><span class="level-item">3</span><span class="level-item">在 Kubernetes 上提升资源利用率的方法</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#1-如何资源划分和限制"><span class="level-left"><span class="level-item">3.1</span><span class="level-item">1. 如何资源划分和限制</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#1-1-使用-Resource-Quota-划分资源"><span class="level-left"><span class="level-item">3.1.1</span><span class="level-item">1.1 使用 Resource Quota 划分资源</span></span></a></li><li><a class="level is-mobile" href="#1-2-使用-Limit-Ranges-限制资源"><span class="level-left"><span class="level-item">3.1.2</span><span class="level-item">1.2 使用 Limit Ranges 限制资源</span></span></a></li></ul></li><li><a class="level is-mobile" href="#2-自动化提升资源利用率的方法"><span class="level-left"><span class="level-item">3.2</span><span class="level-item">2. 自动化提升资源利用率的方法</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#2-1-弹性伸缩"><span class="level-left"><span class="level-item">3.2.1</span><span class="level-item">2.1 弹性伸缩</span></span></a></li><li><a class="level is-mobile" href="#2-2-调度"><span class="level-left"><span class="level-item">3.2.2</span><span class="level-item">2.2 调度</span></span></a></li><li><a class="level is-mobile" href="#2-3-在离线业务混部"><span class="level-left"><span class="level-item">3.2.3</span><span class="level-item">2.3 在离线业务混部</span></span></a></li></ul></li></ul></li><li><a class="level is-mobile" href="#如何权衡资源利用率与稳定性"><span class="level-left"><span class="level-item">4</span><span class="level-item">如何权衡资源利用率与稳定性</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#TKE-上的重调度器"><span class="level-left"><span class="level-item">4.1</span><span class="level-item">TKE 上的重调度器</span></span></a></li></ul></li><li><a class="level is-mobile" href="#总结"><span class="level-left"><span class="level-item">5</span><span class="level-item">总结</span></span></a></li></ul></div></div><style>#toc .menu-list > li > a.is-active + .menu-list { display: block; }#toc .menu-list > li > a + .menu-list { display: none; }</style><script src="/js/toc.js" defer></script></div><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg"></figure><p class="is-size-6 is-block">公众号：面向问题编程</p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives"><p class="title">17</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories"><p class="title">4</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags"><p class="title">7</p></a></div></div></nav></div></div><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/"><span class="level-start"><span class="level-item">一文了解</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/"><span class="level-start"><span class="level-item">技术架构</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BB%BC%E8%BF%B0/"><span class="level-start"><span class="level-item">综述</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E9%97%AE%E9%A2%98/"><span class="level-start"><span class="level-item">问题</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li></ul></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a><p class="is-size-7"><span>&copy; 2022 面向问题编程</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-CN");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script type="text/x-mathjax-config">MathJax.Hub.Config({
+            'HTML-CSS': {
+                matchFontHeight: false
+            },
+            SVG: {
+                matchFontHeight: false
+            },
+            CommonHTML: {
+                matchFontHeight: false
+            },
+            tex2jax: {
+                inlineMath: [
+                    ['$','$'],
+                    ['\\(','\\)']
+                ]
+            }
+        });</script><script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.9/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script><!--!--><!--!--><!--!--><script src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script src="/js/insight.js" defer></script><script>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script></body></html>
