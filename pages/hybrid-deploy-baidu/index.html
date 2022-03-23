@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><title>百度的在离线混部技术 - 面向问题编程</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="面向问题编程"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="面向问题编程"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="【百度云原生导读】服务器资源利用率较低，TCO(IT 基础设施的总拥有成本)逐年上涨，对于拥有大量机器资源的公司来说无疑是一个头疼的问题。 混部技术就是在这种情况下应运而生，目前，混部技术在业界还属于比较小众的领域，只有一些资源量级较大的公司在研究、发展混部技术，以期获得收益。 对于百度而言，通过应用混部技术，主混部集群数十万台，提升CPU利用率到40+%，累计节约了数十亿人民币。目前百度容器引"><meta property="og:type" content="blog"><meta property="og:title" content="百度的在离线混部技术"><meta property="og:url" content="https://www.heapoverflow.cn/pages/hybrid-deploy-baidu/"><meta property="og:site_name" content="面向问题编程"><meta property="og:description" content="【百度云原生导读】服务器资源利用率较低，TCO(IT 基础设施的总拥有成本)逐年上涨，对于拥有大量机器资源的公司来说无疑是一个头疼的问题。 混部技术就是在这种情况下应运而生，目前，混部技术在业界还属于比较小众的领域，只有一些资源量级较大的公司在研究、发展混部技术，以期获得收益。 对于百度而言，通过应用混部技术，主混部集群数十万台，提升CPU利用率到40+%，累计节约了数十亿人民币。目前百度容器引"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://www.heapoverflow.cn/img/hybrid-deploy-baidu/2.jpg"><meta property="article:published_time" content="2022-03-23T15:09:30.355Z"><meta property="article:modified_time" content="2022-03-23T15:19:35.993Z"><meta property="article:author" content="面向问题编程"><meta property="article:tag" content="在离线混部"><meta property="twitter:card" content="summary"><meta property="twitter:image" content="/img/hybrid-deploy-baidu/2.jpg"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.heapoverflow.cn/pages/hybrid-deploy-baidu/"},"headline":"百度的在离线混部技术","image":["https://www.heapoverflow.cn/img/hybrid-deploy-baidu/2.jpg"],"datePublished":"2022-03-23T15:09:30.355Z","dateModified":"2022-03-23T15:19:35.993Z","author":{"@type":"Person","name":"面向问题编程"},"publisher":{"@type":"Organization","name":"面向问题编程","logo":{"@type":"ImageObject","url":"https://www.heapoverflow.cn/img/logo.svg"}},"description":"【百度云原生导读】服务器资源利用率较低，TCO(IT 基础设施的总拥有成本)逐年上涨，对于拥有大量机器资源的公司来说无疑是一个头疼的问题。 混部技术就是在这种情况下应运而生，目前，混部技术在业界还属于比较小众的领域，只有一些资源量级较大的公司在研究、发展混部技术，以期获得收益。 对于百度而言，通过应用混部技术，主混部集群数十万台，提升CPU利用率到40+%，累计节约了数十亿人民币。目前百度容器引"}</script><link rel="canonical" href="https://www.heapoverflow.cn/pages/hybrid-deploy-baidu/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><script src="https://www.googletagmanager.com/gtag/js?id=G-ETGL163DQH" async></script><script>window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    
+        gtag('config', 'G-ETGL163DQH');</script><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><script data-ad-client="ca-pub-6757924689439593" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+          Array
+              .from(document.querySelectorAll('.tab-content'))
+              .forEach($tab => {
+                  $tab.classList.add('is-hidden');
+              });
+          Array
+              .from(document.querySelectorAll('.tabs li'))
+              .forEach($tab => {
+                  $tab.classList.remove('is-active');
+              });
+          const $activeTab = document.querySelector(location.hash);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+          const $tabMenu = document.querySelector(`a[href="${location.hash}"]`);
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 6.0.0"></head><body class="is-2-column"><nav class="navbar navbar-main"><div class="container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/categories/%E9%97%AE%E9%A2%98/">问题</a><a class="navbar-item" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/">技术架构</a><a class="navbar-item" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></div><div class="navbar-end"><a class="navbar-item" target="_blank" rel="noopener" title="分类" href="/categories">分类</a><a class="navbar-item" target="_blank" rel="noopener" title="标签" href="/tags">标签</a><a class="navbar-item" target="_blank" rel="noopener" title="归档" href="/archives">归档</a><a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;"><i class="fas fa-list-ul"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-9-widescreen"><div class="card"><div class="card-image"><span class="image is-7by3"><img class="fill" src="/img/hybrid-deploy-baidu/2.jpg" alt="百度的在离线混部技术"></span></div><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-03-23T15:09:30.355Z" title="2022/3/23 下午11:09:30">2022-03-23</time>发表</span><span class="level-item"><time dateTime="2022-03-23T15:19:35.993Z" title="2022/3/23 下午11:19:35">2022-03-23</time>更新</span><span class="level-item">37 分钟读完 (大约5539个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">百度的在离线混部技术</h1><div class="content"><blockquote>
+<p>【百度云原生导读】服务器资源利用率较低，TCO(IT 基础设施的总拥有成本)逐年上涨，对于拥有大量机器资源的公司来说无疑是一个头疼的问题。</p>
+<p>混部技术就是在这种情况下应运而生，目前，混部技术在业界还属于比较小众的领域，只有一些资源量级较大的公司在研究、发展混部技术，以期获得收益。</p>
+<p>对于百度而言，通过应用混部技术，主混部集群数十万台，提升CPU利用率到40+%，累计节约了数十亿人民币。目前百度容器引擎产品 CCE 已支持在离线混部，并完成了大规模业务落地，本文将带大家深入了解百度的在离线混部技术。</p>
+</blockquote>
+<span id="more"></span>
+
+<h2 id="什么是在离线混部"><a href="#什么是在离线混部" class="headerlink" title="什么是在离线混部"></a>什么是在离线混部</h2><p>混部概念中将应用类型分为在线业务和离线业务两种。</p>
+<p><img src="/img/hybrid-deploy-baidu/0.jpg"></p>
+<p>在线和离线业务如何划分？在百度内部，我们认为在线业务特点包括但不限于：运行时间长，延时敏感，对稳定向要求较高，服务不稳定业务会立马感知并且带来损失，有明显的波峰波谷，白天高，深夜低，比如广告搜索业务；而离线业务的特点包括但不限于非延时敏感，可重试，运行时间一般较短在几十分钟左右，内部一般为大数据计算，机器学习等服务。</p>
+<p>在线业务以搜索为例，白天用户工作学习时查询量会非常大，但是当大部分用户夜间休息时，查询量相对白天就会变得非常小，此时我们就可以引入离线业务。离线业务没有严格的时间要求，随时都能跑，用户关心的是任务能不能跑完，对于什么时候跑完并没有太大的需求，同时如果单机上资源有冲突，此时我们会压制离线业务，甚至会驱逐离线业务，这对用户是无感的，计算平台重新拉起任务，继续计算。</p>
+<p>因此，在线型业务和离线业务具备资源互补的特点，从时间上和对资源的容忍度上可以完美的结合到一起。一方面，在线业务的优先级更高，单机和调度层面会优先保障在线的资源，可能会对离线进行压制和驱逐，另一方面，对于离线任务来说，压制和驱逐对用户是无感的，只需要保证任务顺利完成，有很高的容忍度。</p>
+<p>简单来说，<strong>将在线业务和离线任务混合混部到相同物理资源上，通过资源隔离、调度等控制手段 , 充分使用资源，同时保证服务的稳定性，我们称这样的技术为“混部”。</strong></p>
+<h2 id="资源利用率为何不高？"><a href="#资源利用率为何不高？" class="headerlink" title="资源利用率为何不高？"></a>资源利用率为何不高？</h2><p>纯在线业务集群的平均利用率普遍不高，百度应用混部技术之前，在线业务集群CPU利用率普遍在20%左右，造成这种现象主要由一下几种原因：</p>
+<h3 id="潮汐现象和冗余"><a href="#潮汐现象和冗余" class="headerlink" title="潮汐现象和冗余"></a>潮汐现象和冗余</h3><p>在线业务在申请资源的时候，一般是按照最高峰值评估资源去申请资源，同时还会上调一些，这就导致了业务对资源预估不准，申请的资源远大于实际使用资源。甚至可能会部署多个副本作为灾备。</p>
+<p>此时的低峰时利用率就会非常低，导致整体利用率不高。</p>
+<h3 id="在离线分池"><a href="#在离线分池" class="headerlink" title="在离线分池"></a>在离线分池</h3><p>一般来说机房规划的时候有一个非常大的特点，就是离线机房与在线机房分离做规划。举个例子，假如我们在宁夏做一个机房，这个时候肯定会考虑做一个离线机房，因为在线机房需要考虑网民请求地域分布的问题，要获得最好的访问优化体验以及访问速度，势必需要在一些访问热点上去做自己的在线机房规划，比如北京、上海、广州等。</p>
+<p>而对于离线机房来说不用关心这些，它最在乎的是如何提升计算和储存的资源和基础设施的规模，所以在线业务和离线业务本身的资源需求和特点不一样，资源利用率非常不均衡。常态表现就是在线利用率低，离线利用率高，且常态资源不足。</p>
+<p><img src="/img/hybrid-deploy-baidu/1.jpg"></p>
+<p>针对以上场景，我们通过在离线混部技术将在离线资源统一资源池，把离线作业部署在在线资源池节点上，充分利用机器资源，达到了提升资源利用率的目的。</p>
+<h2 id="百度云原生混部详解"><a href="#百度云原生混部详解" class="headerlink" title="百度云原生混部详解"></a>百度云原生混部详解</h2><p>随着 Kubernetes（以下简称「K8s」） 生态的蓬勃发展，百度很多业务已经搭建并且运维了自己的诸多 K8s 集群，同时也遇到了一些问题，比如上面所说的资源利用率不高。我们根据内部积累混部经验对 K8s 进行在离线混部原生化改造，做到了零入侵K8s，可移植，可支持大规模集群。</p>
+<p><img src="/img/hybrid-deploy-baidu/2.jpg"></p>
+<p> 混部系统架构图</p>
+<h3 id="如何做到资源复用？"><a href="#如何做到资源复用？" class="headerlink" title="如何做到资源复用？"></a>如何做到资源复用？</h3><p><strong>原生 K8s 基于静态视图分配</strong> </p>
+<p><img src="/img/hybrid-deploy-baidu/3.jpg"></p>
+<p>上图显示了一个节点的 CPU 使用率和分配率，分配率为89%， 使用率在0-16点之间都在20%以下，17点开始是用量高峰，在30-40%之间。可以看出 request 和 used 之间有大量的资源处于闲置状态，如果想让这部分资源可以重复利用起来，就需要调度更多的 Pod 上去，但是从 K8s 调度器视角来看，已经没有更多的 CPU 分给 Pod了。</p>
+<p>如果部署 request 和 limit 都不填写的 Pod，此时它可以被调度，但是 K8s 针对这种 BestEffort 的 Pod 不会根据用量调度，可能会被调度到一个实际很繁忙的节点上，非但无法起到提升使用率的效果，可能还会加剧节点上服务的延迟。</p>
+<h4 id="动态资源视图"><a href="#动态资源视图" class="headerlink" title="动态资源视图"></a>动态资源视图</h4><p>针对 K8s 无法根据资源使用量分配资源，我们引入了动态资源视图。</p>
+<p>在混部调度中，在线和离线使用相同的物理资源，在线看到的资源视图和离线看到的资源视图相互独立。在线业务看到的可用资源依旧为整机资源进行静态分配，离线看到的可用资源为整机资源减去在线作业已经使用的资源。</p>
+<p><img src="/img/hybrid-deploy-baidu/4.jpg"></p>
+<p>从图中可以看出，在线申请用量和在线usage之间存在很大的差异，主要是由于研发同学部署业务选择容器资源规格时，带有一定的盲目性，申请量高于实际使用资源量或者按照超出峰值用量申请。混部离线可以复用这部分可回收资源，通过快速填充离线作业，把这部分资源利用起来。</p>
+<p>高中优(在线)为静态分配 ∑High request + ∑Medium request &lt;&#x3D; Host Quota</p>
+<p>动态计算低优(离线)可用量 Low Quota &#x3D; Host Quota - ∑High used - ∑Medium used </p>
+<p>注：以上是理想情况下的公式，实际应用中需要对离线使用量设置一个上限，此处排除了上限造成的影响。下面会有单机资源管理的说明。</p>
+<p>由于 K8s 是静态分配，在 K8s 的 QOS 模型中 BestEffort 是不占用 request 的，即使一个 node 上即使资源已经分配完，但是 BestEffort 类型的资源依然可以调度上去，所以我们复用了 BestEffort 模型给离线任务使用，如上文架构图所示，这样有以下的优点：</p>
+<ul>
+<li><p>解决了在离线视图冲突问题，离线使用的 BestEffort 模型，对在线不可见</p>
+</li>
+<li><p>兼容社区组件，比如 cadvisor 可以直接使用</p>
+</li>
+<li><p>无需修改已有组件，包括 kubelet containerd runc，侵入性小，可以直接安装混部系统，享受混部带来的资源效能提升。</p>
+</li>
+</ul>
+<h3 id="优先级"><a href="#优先级" class="headerlink" title="优先级"></a>优先级</h3><p>由于在离线业务同时部署在相同节点上可能会产生干扰，我们从调度和单机两个方面对在线离线做了优先级区分。</p>
+<p>大的优先级分为(高，中，低)三种，其中高优中优为在线业务，低优为离线业务。每个优先级优化分若干小优先级。</p>
+<p>首先看一下 K8s 的 QOS 模型</p>
+<ul>
+<li><p>Guaranteed :  当 Pod 中所有 Container 的 request &#x3D;&#x3D; limit 时</p>
+</li>
+<li><p>Burstable : 当 Pod 中存在 Container 的 request !&#x3D; limit 时</p>
+</li>
+<li><p>BestEffort : 当 Pod 中所有 Container 均未设置 request, limit 时</p>
+</li>
+</ul>
+<p>对比 K8s 模型，百度混部调度器做了如下扩展：</p>
+<p><img src="/img/hybrid-deploy-baidu/5.jpg"></p>
+<h3 id="资源隔离"><a href="#资源隔离" class="headerlink" title="资源隔离"></a>资源隔离</h3><p>由于在离线混部是<strong>将在线业务和离线任务混合混部到相同物理资源上，</strong>所以在离线业务由于流量激增，出现资源争抢时，如何保证在线的SLA不受影响，并且在保证在线服务的SLA时，也要保证离线任务的整体质量，保证离线作业的成功率和耗时。</p>
+<h4 id="CPU"><a href="#CPU" class="headerlink" title="CPU"></a>CPU</h4><p><strong>cpuset 编排</strong></p>
+<p>针对于需要绑核的在线业务，单机上可以感知到 CPU 拓扑，不需要 kubelet 开启绑核机制，可以直接进行绑核，会将在线业务尽量绑在同一 NUMA node 上，避免跨 node 通信延迟。</p>
+<p><strong>NUMA 调度</strong></p>
+<p>NUMA 是一种内存管理技术，在 NUMA 架构下 CPU 被划分为多个 node，每个 node 都有各自的 CPU core 和 local memory，node core 中的进程访问 local memory 和 remote memory 的代价是不一样的。节点的所有内存对于本节点所有的 CPU 都是等同的，对于其他节点中的所有 CPU 都不同。因此每个 CPU 可以访问整个系统内存，但是访问本地节点的内存速度最快(不经过互联模块)，访问非本地节点的内存速度较慢(需要经过互联模块)，即CPU 访问内存的速度与节点的距离有关。</p>
+<p>针对开启了 NUMA 的节点，我们感知 NUMA 架构，将在线业务绑在同一 NUMA 上，提升在线业务的性能，并且感知 NUMA 节点的负载，当 node 之间出现明显的不平衡时，进行重调度。</p>
+<p><strong>离线调度器</strong></p>
+<p>在线业务要求实时性高，延迟低；为了保证低延迟，CPU 负载不会打的特别高，当 CPU 负载升高时，在线间干扰会导致延时增大。而离线业务一般 CPU 利用率高，但是重吞吐不重延时。所以如果能满足在线的延时保障，在线和离线跑在一个核上不会对在线造成干扰，那么可以极大的提升资源利用率。</p>
+<p>按照现在通用的 Linux 内核调度器调度算法，无法给在线服务做 CPU 的强保障，无法区分在离线业务，会导致在线无法抢占离线 CPU，并且在负载均衡时，因为无法区分在离线业务，可能在线业务会分配到相同的核上，无法打散。导致性能下降。</p>
+<p>离线调度器是一种离线任务专用的CPU调度算法，从调度器上分开，在线调度器看不到离线任务。在线调度器先于离线调度器进行任务调度，存在在线任务时，离线得不到调度。所以对于在线任务来说，可以达到混部前相近的CPU 质量。</p>
+<p><img src="/img/hybrid-deploy-baidu/6.jpg"></p>
+<h4 id="内存"><a href="#内存" class="headerlink" title="内存"></a>内存</h4><p>Linux 系统会经常执行一些写日志、生成备份文件的工作，当这些文件比较大时相应的 cache 就会占用大量的系统内存，而且这些类型的 cache 并不会被经常访问，所以系统会定期将这些 cache flush 到磁盘中。Linux 会通过cache 回收算法进行回收。这会造成两个问题：</p>
+<p>1.容器的 page cache 得不到回收，它依赖于容器管理 page cache 的机制是需要才去回收的方式，即没有后台回收，每次都是分配时候发现到达 limit 了，在 alloc 的时候出发回收，如果业务压力较大，分配的速度大于回收的速度，就可能出现 OOM 的问题</p>
+<p>2.cache 回收时并不会区分在线离线业务，会导致在线业务的 cache 可能会被先于离线 cache 回收掉，如果在线有大量的读 cache 行为，会造成 cache 命中降低，直接进行读盘操作，会导致在线业务的性能下降，甚至会导致IO 夯住。</p>
+<p>为了解决以上的问题，我们新增了背景回收机制，背景回收指的是异步回收 cache，根据在线离线的 QOS 不同，设置不同的背景回收水位，优先回收离线业务的 cache。</p>
+<p><img src="/img/hybrid-deploy-baidu/7.jpg"></p>
+<ul>
+<li><p>每个容器后台周期自动回收自己产生的 page cache</p>
+</li>
+<li><p>每个容器都可以设置开关和自己的高低水位线</p>
+</li>
+</ul>
+<p>网络层面我们也开发了容器级别的出入网带宽限制和流量打标等 Cgroup 子系统，可以对离线进行流量限制。</p>
+<p>更多的内核隔离见下图：</p>
+<p><img src="/img/hybrid-deploy-baidu/8.jpg"></p>
+<h4 id="基于-eBPF-的动态策略"><a href="#基于-eBPF-的动态策略" class="headerlink" title="基于 eBPF 的动态策略"></a>基于 eBPF 的动态策略</h4><p>现有的内核隔离策略都是基于 QOS，创建容器时进行 cgroup 配置，由内核进行统一的资源管理，但是某些高敏业务在最高优先级的 QOS 下也无法保证其特定资源，或者需要某一纬度的资源需要高优保证，此时通用隔离策略无法满足。</p>
+<p>另外由于隔离调度策略是全局统一的策略，业务如果想根据自身特点修改一些隔离能力，只能由业务反馈平台，平台对底层进行修改，周期较长，并且全局应用的隔离能力可能会对离线或者其他业务造成误伤，所以把隔离提升到用户态更符合业务需求。</p>
+<p>针对这样的场景，由于 eBPF 稳定，安全，高效，并有可热加载&#x2F;卸载 eBPF 程序，无需重启 Linux 系统的特性，我们基于 eBPF 开发了定制策略，可以实时下发，实时生效，侵入性小，不需要对业务既有服务和平台侧进行修改。可以在用户态针对某些业务进行定制化隔离策略更新，达到服务可以无差别混部的目标。</p>
+<h4 id="单机资源管理"><a href="#单机资源管理" class="headerlink" title="单机资源管理"></a>单机资源管理</h4><p>在混部时，离线可以占用多少资源一直是一个问题。机型不同，在线服务的敏感度不同，离线业务占用的资源多少对在线造成的影响也不尽相同，针对这种情况，我们对集群纬度，池(具有相同特性的一批机器)纬度，节点纬度对离线可用资源上限做了限制，其中粒度最小优先级最高。</p>
+<p>以 CPU 为例，如下图：</p>
+<p><img src="/img/hybrid-deploy-baidu/9.jpg"></p>
+<p>我们设置了整机的 CPU 阀值X，当整机 CPU 用量趋近或超过一定用量，比如X&#x3D;50%时，会压缩离线使用的CPU资源。</p>
+<p>列举一个简单的公式：</p>
+<p>Offline Quota &#x3D;  Host Quota * X - ∑NotOffline Used</p>
+<p>Offline Free &#x3D; Offline Quota -  ∑Offline used</p>
+<p>同样，对于 Memory，IO和网络我们也做了同样的限制。这样我们可以根据不同的机型和业务很方便的调整离线的用量，避免在线用量升高时性能受到影响。</p>
+<h3 id="高性能调度器"><a href="#高性能调度器" class="headerlink" title="高性能调度器"></a>高性能调度器</h3><p>在线和离线业务的调度需求是不一样的，在线一般为常驻服务，不会频繁变更，对调度器要求较低。但是离线任务由于具有运行时间短(几分钟到几小时)，任务多的特点，以 K8s 默认调度器的调度性能不足以支撑离线任务的调度。所以我们开发了高性能的离线调度器，计算可以达到5000 ops。</p>
+<p><img src="/img/hybrid-deploy-baidu/10.jpg"></p>
+<p>如上图所示，我们调度了15W个 Pod，计算性能可以达到5k ops， 为了防止调度速度过快，对 ETCD 和整个集群造成压力，我们限制了binding速度为1500 ops。</p>
+<h3 id="资源画像"><a href="#资源画像" class="headerlink" title="资源画像"></a>资源画像</h3><p>单机资源隔离是针对已经调度到节点上的任务进行隔离，如果检测到离线任务对在线产生一定的影响后，会很快响应对离线任务进行压制和驱逐的操作。这样会影响离线任务的稳定性。针对这种场景，如果在调度时可以预测到节点上未来一段时间的在线使用量，可以针对性的调度离线任务。</p>
+<p>对比实时计算的资源模型，假设离线作业的运行时间为1小时，如果资源模型使用实时的资源视图，如果在线作业会在半个小时候用量升高，那么当离线作业运行半个小时之后，资源被在线压制，运行质量受影响。</p>
+<p>我们预测了未来1小时窗口内的在线资源用量，调度适当的离线任务上去，即可确保任意离线作业运行过程中资源不受任何压制，从而达到提升运行质量的目的。</p>
+<p><img src="/img/hybrid-deploy-baidu/11.jpg"></p>
+<p>如何提供更稳定的超发资源，则取决于我们资源预测的准确度是什么样的。</p>
+<p>不仅离线调度需要资源画像，在线调度也需要资源画像，通过资源画像可以有效的避免热点产生。</p>
+<p><img src="/img/hybrid-deploy-baidu/12.jpg"></p>
+<ul>
+<li><p>对于在线调度来说，调度的主要目标是提升服务的可用性，在调度时使用资源画像来预测未来一个周期内的用量，可以避免热点问题(某一纬度的资源用量过高)，并且在重调度时也可以规避热点问题。</p>
+</li>
+<li><p>对于离线调度来说，调度的主要目标是提升集群的吞吐，降低作业的排队时间和执行时间，所以资源画像可以提升离线作业的稳定性，避免驱逐重新调度和资源压制导致执行时间过长。</p>
+</li>
+</ul>
+<h2 id="未来展望"><a href="#未来展望" class="headerlink" title="未来展望"></a>未来展望</h2><p>百度目前混部规模数十万台，它的混部集群 CPU 利用率比在线利用率提升 40%—80%，累计节省近10万台服务器。</p>
+<p>未来百度混部的主要目标是继续扩大混部的规模，更大规模地节约资源成本，可以支持更多的负载类型，不局限于在离线混部，要做到无差别混部。</p>
+<ul>
+<li><p>在单机隔离方面，支持更多的业务进入混布，在检测冲突和资源隔离方面做的更好。</p>
+</li>
+<li><p> 调度方面做更有计划的调度，资源画像更加精细化，调度时可以更精准的预测热点概率，优化调度能力，减少热点率。</p>
+</li>
+</ul>
+<p>并在以下方向投入更多的力量：</p>
+<ul>
+<li>内核可编程技术：</li>
+</ul>
+<p>         通过 eBPF 可观测技术的创新，实现混部容器负载性能的近距离观察，达到进一步无损高密度混</p>
+<p>         利用 eBPF 热加载&#x2F;卸载的特性，可以用户态下发隔离策略，快速的解决高敏的资源质量问题</p>
+<ul>
+<li><p>异构：更好的支持GPU等异构资源混部，提高异构资源效能与弹性，大幅降低GPU成本。</p>
+</li>
+<li><p>容器虚机融合：解决高密机型共享内核混部的瓶颈。</p>
+</li>
+<li><p>多云混部：结合公有云进行极致的弹性，例如结合弹性竞价实例，基于用户对价格的敏感度设置，自动纳入或者摘除竞价实例，用于离线业务运行或混部，实现多云弹性混部。</p>
+</li>
+</ul>
+<article class="message message-immersive is-primary">
+<div class="message-body">
+<i class="fas fa-globe-asia mr-2"></i>本文来自
+<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/59lfh-HMTzze1AYokshv0A">百度云原生</a>.
+</div>
+</article></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E5%9C%A8%E7%A6%BB%E7%BA%BF%E6%B7%B7%E9%83%A8/">在离线混部</a></div><!--!--><div><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6757924689439593" crossOrigin="anonymous"></script><ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-6757924689439593" data-ad-slot="2352785969"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div></article></div><!--!--><nav class="post-navigation mt-4 level is-mobile"><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/pages/k8s-resource-utils-tx/"><span class="level-item">腾讯：如何提升Kubernetes集群资源利用率</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--></div><!--!--><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen  order-3 is-sticky"><div class="card widget" id="toc" data-type="toc"><div class="card-content"><div class="menu"><h3 class="menu-label">目录</h3><ul class="menu-list"><li><a class="level is-mobile" href="#什么是在离线混部"><span class="level-left"><span class="level-item">1</span><span class="level-item">什么是在离线混部</span></span></a></li><li><a class="level is-mobile" href="#资源利用率为何不高？"><span class="level-left"><span class="level-item">2</span><span class="level-item">资源利用率为何不高？</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#潮汐现象和冗余"><span class="level-left"><span class="level-item">2.1</span><span class="level-item">潮汐现象和冗余</span></span></a></li><li><a class="level is-mobile" href="#在离线分池"><span class="level-left"><span class="level-item">2.2</span><span class="level-item">在离线分池</span></span></a></li></ul></li><li><a class="level is-mobile" href="#百度云原生混部详解"><span class="level-left"><span class="level-item">3</span><span class="level-item">百度云原生混部详解</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#如何做到资源复用？"><span class="level-left"><span class="level-item">3.1</span><span class="level-item">如何做到资源复用？</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#动态资源视图"><span class="level-left"><span class="level-item">3.1.1</span><span class="level-item">动态资源视图</span></span></a></li></ul></li><li><a class="level is-mobile" href="#优先级"><span class="level-left"><span class="level-item">3.2</span><span class="level-item">优先级</span></span></a></li><li><a class="level is-mobile" href="#资源隔离"><span class="level-left"><span class="level-item">3.3</span><span class="level-item">资源隔离</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#CPU"><span class="level-left"><span class="level-item">3.3.1</span><span class="level-item">CPU</span></span></a></li><li><a class="level is-mobile" href="#内存"><span class="level-left"><span class="level-item">3.3.2</span><span class="level-item">内存</span></span></a></li><li><a class="level is-mobile" href="#基于-eBPF-的动态策略"><span class="level-left"><span class="level-item">3.3.3</span><span class="level-item">基于 eBPF 的动态策略</span></span></a></li><li><a class="level is-mobile" href="#单机资源管理"><span class="level-left"><span class="level-item">3.3.4</span><span class="level-item">单机资源管理</span></span></a></li></ul></li><li><a class="level is-mobile" href="#高性能调度器"><span class="level-left"><span class="level-item">3.4</span><span class="level-item">高性能调度器</span></span></a></li><li><a class="level is-mobile" href="#资源画像"><span class="level-left"><span class="level-item">3.5</span><span class="level-item">资源画像</span></span></a></li></ul></li><li><a class="level is-mobile" href="#未来展望"><span class="level-left"><span class="level-item">4</span><span class="level-item">未来展望</span></span></a></li></ul></div></div><style>#toc .menu-list > li > a.is-active + .menu-list { display: block; }#toc .menu-list > li > a + .menu-list { display: none; }</style><script src="/js/toc.js" defer></script></div><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg"></figure><p class="is-size-6 is-block">公众号：面向问题编程</p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives"><p class="title">18</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories"><p class="title">4</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags"><p class="title">7</p></a></div></div></nav></div></div><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/"><span class="level-start"><span class="level-item">一文了解</span></span><span class="level-end"><span class="level-item tag">4</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/"><span class="level-start"><span class="level-item">技术架构</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BB%BC%E8%BF%B0/"><span class="level-start"><span class="level-item">综述</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E9%97%AE%E9%A2%98/"><span class="level-start"><span class="level-item">问题</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li></ul></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a><p class="is-size-7"><span>&copy; 2022 面向问题编程</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-CN");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script type="text/x-mathjax-config">MathJax.Hub.Config({
+            'HTML-CSS': {
+                matchFontHeight: false
+            },
+            SVG: {
+                matchFontHeight: false
+            },
+            CommonHTML: {
+                matchFontHeight: false
+            },
+            tex2jax: {
+                inlineMath: [
+                    ['$','$'],
+                    ['\\(','\\)']
+                ]
+            }
+        });</script><script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.9/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script><!--!--><!--!--><!--!--><script src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script src="/js/insight.js" defer></script><script>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script></body></html>

@@ -2,6 +2,15 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <url>
+    <loc>https://www.heapoverflow.cn/pages/hybrid-deploy-baidu/</loc>
+    
+    <lastmod>2022-03-23</lastmod>
+    
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <url>
     <loc>https://www.heapoverflow.cn/pages/k8s-resource-utils-tx/</loc>
     
     <lastmod>2022-03-23</lastmod>
@@ -208,14 +217,14 @@
   </url>
   
   <url>
-    <loc>https://www.heapoverflow.cn/tags/%E7%A6%BB%E5%9C%A8%E7%BA%BF%E6%B7%B7%E9%83%A8/</loc>
+    <loc>https://www.heapoverflow.cn/tags/Kubernetes/</loc>
     <lastmod>2022-03-23</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.2</priority>
   </url>
   
   <url>
-    <loc>https://www.heapoverflow.cn/tags/Kubernetes/</loc>
+    <loc>https://www.heapoverflow.cn/tags/%E5%9C%A8%E7%A6%BB%E7%BA%BF%E6%B7%B7%E9%83%A8/</loc>
     <lastmod>2022-03-23</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.2</priority>
