@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><title>TKE基于弹性网卡直连Pod的网络负载均衡 - 面向问题编程</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="面向问题编程"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="面向问题编程"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="作者周宏宇，后台开发，目前负责腾讯云TKE的接入层网络组件（Ingress、Service）。在团队中负责接入层组件的技术方案、开发测试以及相关的服务技术支持。"><meta property="og:type" content="blog"><meta property="og:title" content="TKE基于弹性网卡直连Pod的网络负载均衡"><meta property="og:url" content="https://www.heapoverflow.cn/pages/tke-eni/"><meta property="og:site_name" content="面向问题编程"><meta property="og:description" content="作者周宏宇，后台开发，目前负责腾讯云TKE的接入层网络组件（Ingress、Service）。在团队中负责接入层组件的技术方案、开发测试以及相关的服务技术支持。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://www.heapoverflow.cn/img/tke-eni/3.jpg"><meta property="article:published_time" content="2022-03-26T04:59:48.016Z"><meta property="article:modified_time" content="2022-03-26T05:07:13.714Z"><meta property="article:author" content="面向问题编程"><meta property="article:tag" content="Kubernetes"><meta property="twitter:card" content="summary"><meta property="twitter:image" content="/img/tke-eni/3.jpg"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.heapoverflow.cn/pages/tke-eni/"},"headline":"TKE基于弹性网卡直连Pod的网络负载均衡","image":["https://www.heapoverflow.cn/img/tke-eni/3.jpg"],"datePublished":"2022-03-26T04:59:48.016Z","dateModified":"2022-03-26T05:07:13.714Z","author":{"@type":"Person","name":"面向问题编程"},"publisher":{"@type":"Organization","name":"面向问题编程","logo":{"@type":"ImageObject","url":"https://www.heapoverflow.cn/img/logo.svg"}},"description":"作者周宏宇，后台开发，目前负责腾讯云TKE的接入层网络组件（Ingress、Service）。在团队中负责接入层组件的技术方案、开发测试以及相关的服务技术支持。"}</script><link rel="canonical" href="https://www.heapoverflow.cn/pages/tke-eni/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><script src="https://www.googletagmanager.com/gtag/js?id=G-ETGL163DQH" async></script><script>window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    
+        gtag('config', 'G-ETGL163DQH');</script><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><script data-ad-client="ca-pub-6757924689439593" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+          Array
+              .from(document.querySelectorAll('.tab-content'))
+              .forEach($tab => {
+                  $tab.classList.add('is-hidden');
+              });
+          Array
+              .from(document.querySelectorAll('.tabs li'))
+              .forEach($tab => {
+                  $tab.classList.remove('is-active');
+              });
+          const $activeTab = document.querySelector(location.hash);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+          const $tabMenu = document.querySelector(`a[href="${location.hash}"]`);
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 6.0.0"></head><body class="is-2-column"><nav class="navbar navbar-main"><div class="container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/categories/%E9%97%AE%E9%A2%98/">问题</a><a class="navbar-item" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/">技术架构</a><a class="navbar-item" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></div><div class="navbar-end"><a class="navbar-item" rel="noopener" title="分类" href="/categories">分类</a><a class="navbar-item" rel="noopener" title="标签" href="/tags">标签</a><a class="navbar-item" rel="noopener" title="归档" href="/archives">归档</a><a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;"><i class="fas fa-list-ul"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-9-widescreen"><div class="card"><div class="card-image"><span class="image is-7by3"><img class="fill" src="/img/tke-eni/3.jpg" alt="TKE基于弹性网卡直连Pod的网络负载均衡"></span></div><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-03-26T04:59:48.016Z" title="2022/3/26 下午12:59:48">2022-03-26</time>发表</span><span class="level-item"><time dateTime="2022-03-26T05:07:13.714Z" title="2022/3/26 下午1:07:13">2022-03-26</time>更新</span><span class="level-item">28 分钟读完 (大约4186个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">TKE基于弹性网卡直连Pod的网络负载均衡</h1><div class="content"><p>作者周宏宇，后台开发，目前负责腾讯云TKE的接入层网络组件（Ingress、Service）。在团队中负责接入层组件的技术方案、开发测试以及相关的服务技术支持。</p>
+<span id="more"></span>
+
+<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p><code>Kubernetes</code>在集群接入层设计并提供了两种原生资源<code>Service</code>和<code>Ingress</code>，分别负责四层和七层的网络接入层配置。</p>
+<p>传统的做法是创建Ingress或LoadBalancer类型的Service来绑定腾讯云的负载均衡将服务对外暴露。这种做法将用户流量负载到用户节点的NodePort上，通过KubeProxy组件转发到容器网络中，但这种方案在业务的性能和能力支持会有所局限。</p>
+<p>为了解决这个问题，TKE容器团队为在腾讯云上<strong>使用独立或托管集群的用户提供了一种新的网络模式，利用弹性网卡直连Pod的方案很大的增强了性能和业务能力的支持</strong>。</p>
+<table>
+<thead>
+<tr>
+<th align="center">方面</th>
+<th align="center">直连方案</th>
+<th align="center">NodePort转发</th>
+<th align="center">Local转发</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">性能</td>
+<td align="center">无损失</td>
+<td align="center">NAT转发+节点间转发</td>
+<td align="center">少量损失</td>
+</tr>
+<tr>
+<td align="center">Pod更新</td>
+<td align="center">接入层后端主动同步更新、更新稳定</td>
+<td align="center">接入层后端NodePort保持不变</td>
+<td align="center">更新不同步可能导致服务中断</td>
+</tr>
+<tr>
+<td align="center">集群依赖</td>
+<td align="center">集群版本要求、VPC-CNI网络要求</td>
+<td align="center">-</td>
+<td align="center">-</td>
+</tr>
+<tr>
+<td align="center">业务能力限制</td>
+<td align="center">最佳</td>
+<td align="center">无法获取来源IP、无法进行会话保持</td>
+<td align="center">有条件的会话保持</td>
+</tr>
+</tbody></table>
+<p>本文将会从传统的模式的问题入手，比较新旧模式的区别，并在最后提供新直连模式的使用指引。</p>
+<h2 id="传统模式面临的问题与挑战"><a href="#传统模式面临的问题与挑战" class="headerlink" title="传统模式面临的问题与挑战"></a>传统模式面临的问题与挑战</h2><h3 id="性能与特性"><a href="#性能与特性" class="headerlink" title="性能与特性"></a>性能与特性</h3><p><code>KubeProxy</code>在集群中会将用户<code>NodePort</code>的流量通过NAT的方式转发到集群网络中。这个NAT转发带来了以下一些问题。</p>
+<ol>
+<li><p>NAT转发导致请求在性能上有一定的损失。</p>
+</li>
+<li><p>进行NAT操作本身会带来性能上的损失。</p>
+</li>
+<li><p>NAT转发的目的地址可能会使得流量在容器网络内跨节点转发。</p>
+</li>
+<li><p>NAT转发导致请求的来源IP被修改了，客户端无法获取来源IP。</p>
+</li>
+<li><p>当负载均衡的流量集中到几个NodePort时。过于集中的流量会导致NodePort的SNAT转发过多，使得源端口耗尽流量异常。还可能导致 conntrack 插入冲突导致丢包，影响性能。</p>
+</li>
+<li><p><code>KubeProxy</code>的转发具有随机性，无法支持会话保持。</p>
+</li>
+<li><p><code>KubeProxy</code>的每个NodePort其实也起到独立的负载均衡作用，由于负载均衡无法收敛到一个地方，所以难以达到全局的负载均衡。</p>
+</li>
+</ol>
+<p>为了解决以上问题，我们以前给用户提供的技术建议主要是通过Local转发的方式，避免<code>KubeProxy</code>NAT转发带来的问题。但是因为转发的随机性，一个节点上部署多个副本时会话保持依旧无法支持。而且Local转发在滚动更新时，容易出现服务的闪断，对业务的滚动更新策略以及优雅停机提出了更高的要求。我们有理由去寻找更好的方案解决这个问题。</p>
+<h3 id="业务可用性"><a href="#业务可用性" class="headerlink" title="业务可用性"></a>业务可用性</h3><p>通过NodePort接入服务时，NodePort的设计存在极大的容错性。负载均衡会绑定集群所有节点的NodePort作为后端。集群任意一个节点的访问服务时，流量将随机分配到集群的工作负载中。这就意味着部分NodePort的不可用，或者是Pod的不可用都不会影响服务的流量接入。</p>
+<p>和Local访问一样，直接将负载均衡后端连接到用户Pod的情况下，当业务在滚动更新时，如果负载均衡不能够及时绑定上新的Pod，业务的快速滚动可能导致业务入口的负载均衡后端数量严重不足甚至被清空。因此，业务滚动更新的时候，接入层的负载均衡的状态良好，方能保证滚动更新的安全平稳。</p>
+<h3 id="负载均衡的控制面性能"><a href="#负载均衡的控制面性能" class="headerlink" title="负载均衡的控制面性能"></a>负载均衡的控制面性能</h3><p>负载均衡的控制面接口。包括创建删除修改四层、七层监听器，创建删除七层规则，绑定各个监听器或者规则的后端。这些接口大部分是异步接口，需要轮询请求结果，接口的调用时间相对较长。当用户集群规模较大时，大量的接入层资源同步会导致组件存在很大的时延上的压力。</p>
+<h2 id="新旧模式对比"><a href="#新旧模式对比" class="headerlink" title="新旧模式对比"></a>新旧模式对比</h2><h3 id="控制面性能对比"><a href="#控制面性能对比" class="headerlink" title="控制面性能对比"></a>控制面性能对比</h3><p>Pod直连模式已经在腾讯TKE上线，是对负载均衡的控制面优化。针对整个同步流程，重点优化了批量调用和后端实例查询两个远程调用比较频繁的地方。<strong>优化完成后，Ingress典型场景下的控制面性能较优化前版本有了95%-97%左右的性能提升。</strong>目前同步的耗时主要集中在异步接口的等待上。</p>
+<h4 id="后端节点突增-应对集群扩容的场景"><a href="#后端节点突增-应对集群扩容的场景" class="headerlink" title="后端节点突增 (应对集群扩容的场景)"></a>后端节点突增 (应对集群扩容的场景)</h4><p><img src="/img/tke-eni/0.jpg"></p>
+<p>七层规则突增（应对业务第一次上线部署到集群的场景）</p>
+<p><img src="/img/tke-eni/1.jpg"></p>
+<p><img src="/img/tke-eni/2.jpg">  </p>
+<p>除去控制面性能优化这样的硬核优化，负载均衡能够直接访问容器网络的Pod就是组件业务能力最重要的组成部分了，其不仅避免了NAT转发性能上的损失，同时避免了NAT转发带来的各种对集群内业务功能影响。但是在启动该项目时这一块还没有特别好的访问容器网络的支持。所以一期考虑集群CNI网络模式下Pod有弹性网卡入口，这个入口可以直接接入到负载均衡以达到直接访问的目的。负载均衡直接后端访问到容器网络，目前已经有通过云联网解决的方案，后续也会继续跟进这种更贴近集群网络的直连方案。</p>
+<p>接下来能够直接访问了，如何保证滚动更新时的可用性保证呢？我们找到了官方提供的一个特性<code>ReadinessGate</code>。这个特性在1.12正式提供出来，主要是用来控制Pod的状态。默认情况下，Pod有以下Condition：PodScheduled、Initialized、ContainersReady，当这几个状态都Ready的时候，Pod Ready的Condition就通过了。但是在云原生的场景下面，Pod的状态是非常有可能需要参考其他状态的。<code>ReadinessGate</code>提供了这样一个机制，允许为Pod的状态判断添加一个栅栏，由第三方来进行判断与控制。这样Pod的状态就和第三方关联起来了。</p>
+<h3 id="负载均衡流量对比"><a href="#负载均衡流量对比" class="headerlink" title="负载均衡流量对比"></a>负载均衡流量对比</h3><h4 id="传统NodePort模式"><a href="#传统NodePort模式" class="headerlink" title="传统NodePort模式"></a>传统NodePort模式</h4><p><img src="/img/tke-eni/3.jpg"></p>
+<p>传统NodePort接入</p>
+<h4 id="请求细节过程"><a href="#请求细节过程" class="headerlink" title="请求细节过程"></a>请求细节过程</h4><ol>
+<li>请求流量进入负载均衡</li>
+<li>请求被负载均衡转发到某一个节点的NodePort</li>
+<li>KubeProxy将来自NodePort的流量进行NAT转发，目的地址是随机的一个Pod。</li>
+<li>请求进入容器网络，并根据Pod地址转发到对应节点。</li>
+<li>请求来到Pod所属节点，转发到Pod。</li>
+</ol>
+<h4 id="新的Pod直连模式"><a href="#新的Pod直连模式" class="headerlink" title="新的Pod直连模式"></a>新的Pod直连模式</h4><p><img src="/img/tke-eni/4.jpg"></p>
+<p>ENI弹性网卡直连</p>
+<h4 id="请求细节过程-1"><a href="#请求细节过程-1" class="headerlink" title="请求细节过程"></a>请求细节过程</h4><ol>
+<li>请求流量进入负载均衡</li>
+<li>请求被负载均衡转发到某一个Pod的ENI弹性网卡</li>
+</ol>
+<h3 id="直连与Local访问的区别"><a href="#直连与Local访问的区别" class="headerlink" title="直连与Local访问的区别"></a>直连与Local访问的区别</h3><p>看起来这两种访问方式的效果是一样的，但是在细节上还是存在一些差别。</p>
+<ol>
+<li>从性能上区别不大，开启Local访问时，流量不会进行NAT操作也不会进行跨节点转发，所以仅仅多了一个到容器网络的路由。</li>
+<li>没有进行NAT操作，来源IP就能够正确获取了。会话保持功能可能会有以下问题，当一个节点上存在多个Pod时，流量到哪一个Pod是随机的，这个机制可能会使话保持出现问题。</li>
+</ol>
+<h3 id="ReadinessGate的引入"><a href="#ReadinessGate的引入" class="headerlink" title="ReadinessGate的引入"></a>ReadinessGate的引入</h3><p>前面有两个细节，可以在这里得到解答。</p>
+<ol>
+<li>为什么要求集群版本高于 1.12</li>
+<li>为什么<code>kubectl get pod -o wide</code>的结果中<code>READINESS GATES</code>列有内容。</li>
+</ol>
+<p><strong>这里涉及到一个滚动更新相关的问题</strong></p>
+<p>当用户开始为应用做滚动更新的时候，<code>Kubernetes</code>会根据更新策略进行滚动更新。但是其判断一批Pod启动的标识仅包括Pod自身的状态，并不会考虑这个Pod在负载均衡上是否已经进行配置健康检查是否通过。有的时候当接入层组件高负载，不能及时对这些Pod进行及时调度的话，这些滚动更新成功的Pod可能并没有正在对外提供服务，从而导致服务的中断。为了将滚动更新和负载均衡的后端状态关联起来，TKE接入层组件引入了Kubernetes 1.12中引入的新特性<code>ReadinessGate</code>。TKE接入层组件只有在确认后端绑定成功并且健康检查通过时，通过配置<code>ReadinessGate</code>的状态来使Pod达到Ready的状态，从而推动整个工作负载的滚动更新。</p>
+<p><strong>在集群中使用<code>ReadinessGate</code>的细节</strong></p>
+<p>Kubernetes集群提供的是一个服务注册的机制，你只需要将你的服务以<code>MutatingWebhookConfigurations</code>资源的形式注册到集群中就可以了。集群会在Pod创建的时候按照你的配置的回调路径通知你，这个时候就可以对Pod做一些创建前的操作，在这个Case里面就是给Pod加上<code>ReadinessGate</code>。唯一需要注意的就是这个回调过程必须是Https的，所以标配需要在<code>MutatingWebhookConfigurations</code>中配置签发请求的CA，并在服务端配置该CA签发的证书。</p>
+<p><strong><code>ReadinessGate</code>机制的灾难恢复</strong></p>
+<p>用户集群中的服务注册或是证书有可能被用户删除，虽然这些系统组件资源不应该被用户修改或破坏。但在用户对集群的探索或是误操作下，这类问题会不可避免的出现。所以接入层组件在启动时会检查以上资源的完整性，在完整性受到破坏时会重建以上资源，加强系统的鲁棒性。</p>
+<h3 id="QPS和网络时延对比"><a href="#QPS和网络时延对比" class="headerlink" title="QPS和网络时延对比"></a>QPS和网络时延对比</h3><p>直连与NodePort是服务应用的接入层方案，其实最终参与工作的还是用户部署的工作负载，用户工作负载的能力直接决定了业务的QPS等指标。所以我们针对这两种接入层方案，在工作负载压力较低的情况下，重点针对网络链路的时延进行了一些对比测试。直连在接入层的网络链路上能够优化10%左右的时间。同时测试中的监控也发现，直连模式减少了大量VPC网络内的流量。测试场景，从20节点到80节点，逐步增大集群规模，通过wrk工具对集群进行网络延时的测试。针对QPS和网络时延，下图给出了直连场景与NodePort的对比测试。</p>
+<p><img src="/img/tke-eni/5.jpg"></p>
+<p>性能测试对比</p>
+<h3 id="KubeProxy的一些设计思考"><a href="#KubeProxy的一些设计思考" class="headerlink" title="KubeProxy的一些设计思考"></a>KubeProxy的一些设计思考</h3><p><code>KubeProxy</code>的缺点也在前文中提到的一样明显。但是基于云上负载均衡、VPC网络的各种特性，我们能给出各种其他更加本地化的接入层方案。但这并不意味着<code>KubeProxy</code>的设计不好或是作用不大。其对集群接入层的设计极具普适性、容错性，基本适用于所有业务场景下的集群，作为一个官方提供的组件这个设计是非常合适的。</p>
+<h2 id="新模式使用指引"><a href="#新模式使用指引" class="headerlink" title="新模式使用指引"></a>新模式使用指引</h2><h3 id="前置要求"><a href="#前置要求" class="headerlink" title="前置要求"></a>前置要求</h3><ol>
+<li><code>Kubernetes</code>集群版本需要高于 1.12。</li>
+<li>集群网络模式必须开启<code>VPC-CNI</code>弹性网卡模式。</li>
+<li>直连模式<code>Service</code>使用的工作负载需使用<code>VPC-CNI</code>弹性网卡模式。</li>
+</ol>
+<h3 id="控制台操作指引"><a href="#控制台操作指引" class="headerlink" title="控制台操作指引"></a>控制台操作指引</h3><ol>
+<li><p>登录 容器服务控制台[1]。</p>
+</li>
+<li><p>参考控制台 创建 Service [2]步骤，进入 “新建Service” 页面，根据实际需求设置 Service 参数。</p>
+<p>其中，部分关键参数信息需进行如下设置，如下图所示：</p>
+<p><img src="/img/tke-eni/6.jpg"></p>
+<ul>
+<li><strong>服务访问方式</strong>：选择为【提供公网访问】或【VPC内网访问】。</li>
+<li><strong>网络模式</strong>：勾选【采用负载均衡直连Pod模式】。</li>
+<li><strong>Workload绑定</strong>：选择【引用Worklocad】，并在弹出窗口中选择 VPC-CNI 模式的后端工作负载。</li>
+</ul>
+</li>
+<li><p>单击【创建服务】，完成创建。</p>
+</li>
+</ol>
+<h3 id="Kubectl操作指引"><a href="#Kubectl操作指引" class="headerlink" title="Kubectl操作指引"></a>Kubectl操作指引</h3><ul>
+<li><p><strong>Workload示例：nginx-deployment-eni.yaml</strong></p>
+<blockquote>
+<p>注意<code>spec.template.metadata.annotations</code>中声明了<code>tke.cloud.tencent.com/networks: tke-route-eni</code>，在工作负载使用VPC-CNI弹性网卡模式。</p>
+</blockquote>
+</li>
+</ul>
+<figure class="highlight properties"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">apiVersion</span>: <span class="string">apps/v1</span></span><br><span class="line"><span class="attr">kind</span>: <span class="string">Deployment</span></span><br><span class="line"><span class="attr">metadata</span>:<span class="string"></span></span><br><span class="line">  <span class="attr">labels</span>:<span class="string"></span></span><br><span class="line">    <span class="attr">app</span>: <span class="string">nginx</span></span><br><span class="line">  <span class="attr">name</span>: <span class="string">nginx-deployment-eni</span></span><br><span class="line"><span class="attr">spec</span>:<span class="string"></span></span><br><span class="line">  <span class="attr">replicas</span>: <span class="string">3</span></span><br><span class="line">  <span class="attr">selector</span>:<span class="string"></span></span><br><span class="line">    <span class="attr">matchLabels</span>:<span class="string"></span></span><br><span class="line">      <span class="attr">app</span>: <span class="string">nginx</span></span><br><span class="line">  <span class="attr">template</span>:<span class="string"></span></span><br><span class="line">    <span class="attr">metadata</span>:<span class="string"></span></span><br><span class="line">      <span class="attr">annotations</span>:<span class="string"></span></span><br><span class="line">        <span class="attr">tke.cloud.tencent.com/networks</span>: <span class="string">tke-route-eni</span></span><br><span class="line">      <span class="attr">labels</span>:<span class="string"></span></span><br><span class="line">        <span class="attr">app</span>: <span class="string">nginx</span></span><br><span class="line">    <span class="attr">spec</span>:<span class="string"></span></span><br><span class="line">      <span class="attr">containers</span>:<span class="string"></span></span><br><span class="line">        <span class="attr">-</span> <span class="string">image: nginx:1.7.9</span></span><br><span class="line">          <span class="attr">name</span>: <span class="string">nginx</span></span><br><span class="line">          <span class="attr">ports</span>:<span class="string"></span></span><br><span class="line">            <span class="attr">-</span> <span class="string">containerPort: 80</span></span><br><span class="line">              <span class="attr">protocol</span>: <span class="string">TCP</span></span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><p>Service示例：nginx-service-eni.yaml</p>
+<blockquote>
+<p>注意：<code>metadata.annotations</code>中声明了<code>service.cloud.tencent.com/direct-access: &quot;true&quot;</code>，Service在同步负载均衡时将采用直连的方式配置访问后端。</p>
+</blockquote>
+</li>
+</ul>
+<figure class="highlight properties"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">apiVersion</span>: <span class="string">v1</span></span><br><span class="line"><span class="attr">kind</span>: <span class="string">Service</span></span><br><span class="line"><span class="attr">metadata</span>:<span class="string"></span></span><br><span class="line">  <span class="attr">annotations</span>:<span class="string"></span></span><br><span class="line">    <span class="attr">service.cloud.tencent.com/direct-access</span>: <span class="string">&quot;true&quot;</span></span><br><span class="line">  <span class="attr">labels</span>:<span class="string"></span></span><br><span class="line">    <span class="attr">app</span>: <span class="string">nginx</span></span><br><span class="line">  <span class="attr">name</span>: <span class="string">nginx-service-eni</span></span><br><span class="line"><span class="attr">spec</span>:<span class="string"></span></span><br><span class="line">  <span class="attr">externalTrafficPolicy</span>: <span class="string">Cluster</span></span><br><span class="line">  <span class="attr">ports</span>:<span class="string"></span></span><br><span class="line">    <span class="attr">-</span> <span class="string">name: 80-80-no</span></span><br><span class="line">      <span class="attr">port</span>: <span class="string">80</span></span><br><span class="line">      <span class="attr">protocol</span>: <span class="string">TCP</span></span><br><span class="line">      <span class="attr">targetPort</span>: <span class="string">80</span></span><br><span class="line">  <span class="attr">selector</span>:<span class="string"></span></span><br><span class="line">    <span class="attr">app</span>: <span class="string">nginx</span></span><br><span class="line">  <span class="attr">sessionAffinity</span>: <span class="string">None</span></span><br><span class="line">  <span class="attr">type</span>: <span class="string">LoadBalancer</span></span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><p>部署以上内容到集群</p>
+<blockquote>
+<p>注意：在你的环境下，首先需要连接到集群（没有集群的需要先创建集群），可以参考文章尾部的帮助文档配置kubectl连接集群。</p>
+</blockquote>
+</li>
+</ul>
+<figure class="highlight swift"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="operator">➜</span>  <span class="operator">~</span> kubectl apply <span class="operator">-</span>f nginx<span class="operator">-</span>deployment<span class="operator">-</span>eni.yaml</span><br><span class="line">deployment.apps<span class="operator">/</span>nginx<span class="operator">-</span>deployment<span class="operator">-</span>eni created</span><br><span class="line"><span class="operator">➜</span>  <span class="operator">~</span> kubectl apply <span class="operator">-</span>f nginx<span class="operator">-</span>service<span class="operator">-</span>eni.yaml</span><br><span class="line">service<span class="operator">/</span>nginx<span class="operator">-</span>service<span class="operator">-</span>eni configured</span><br><span class="line"><span class="operator">➜</span>  <span class="operator">~</span> kubectl <span class="keyword">get</span> pod <span class="operator">-</span>o wide</span><br><span class="line"><span class="type">NAME</span>                                   <span class="type">READY</span>   <span class="type">STATUS</span>    <span class="type">RESTARTS</span>   <span class="type">AGE</span>   <span class="type">IP</span>               <span class="type">NODE</span>          <span class="type">NOMINATED</span> <span class="type">NODE</span>   <span class="type">READINESS</span> <span class="type">GATES</span></span><br><span class="line">nginx<span class="operator">-</span>deployment<span class="operator">-</span>eni<span class="operator">-</span>bb7544db8<span class="operator">-</span>6ljkm   <span class="number">1</span><span class="operator">/</span><span class="number">1</span>     <span class="type">Running</span>   <span class="number">0</span>          24s   <span class="number">172.17</span>.<span class="number">160.191</span>   <span class="number">172.17</span>.<span class="number">0.3</span>    <span class="operator">&lt;</span>none<span class="operator">&gt;</span>           <span class="number">1</span><span class="operator">/</span><span class="number">1</span></span><br><span class="line">nginx<span class="operator">-</span>deployment<span class="operator">-</span>eni<span class="operator">-</span>bb7544db8<span class="operator">-</span>xqqtv   <span class="number">1</span><span class="operator">/</span><span class="number">1</span>     <span class="type">Running</span>   <span class="number">0</span>          24s   <span class="number">172.17</span>.<span class="number">160.190</span>   <span class="number">172.17</span>.<span class="number">0.46</span>   <span class="operator">&lt;</span>none<span class="operator">&gt;</span>           <span class="number">1</span><span class="operator">/</span><span class="number">1</span></span><br><span class="line">nginx<span class="operator">-</span>deployment<span class="operator">-</span>eni<span class="operator">-</span>bb7544db8<span class="operator">-</span>zk2cx   <span class="number">1</span><span class="operator">/</span><span class="number">1</span>     <span class="type">Running</span>   <span class="number">0</span>          24s   <span class="number">172.17</span>.<span class="number">160.189</span>   <span class="number">172.17</span>.<span class="number">0.9</span>    <span class="operator">&lt;</span>none<span class="operator">&gt;</span>           <span class="number">1</span><span class="operator">/</span><span class="number">1</span></span><br><span class="line"><span class="operator">➜</span>  <span class="operator">~</span> kubectl <span class="keyword">get</span> service <span class="operator">-</span>o wide</span><br><span class="line"><span class="type">NAME</span>                <span class="type">TYPE</span>           <span class="type">CLUSTER</span><span class="operator">-</span><span class="type">IP</span>      <span class="type">EXTERNAL</span><span class="operator">-</span><span class="type">IP</span>      <span class="type">PORT</span>(<span class="type">S</span>)        <span class="type">AGE</span>    <span class="type">SELECTOR</span></span><br><span class="line">kubernetes          <span class="type">ClusterIP</span>      <span class="number">10.187</span>.<span class="number">252.1</span>    <span class="operator">&lt;</span>none<span class="operator">&gt;</span>           <span class="number">443</span><span class="operator">/</span><span class="type">TCP</span>        6d4h   <span class="operator">&lt;</span>none<span class="operator">&gt;</span></span><br><span class="line">nginx<span class="operator">-</span>service<span class="operator">-</span>eni   <span class="type">LoadBalancer</span>   <span class="number">10.187</span>.<span class="number">254.62</span>   <span class="number">150.158</span>.<span class="number">221.31</span>   <span class="number">80</span>:<span class="number">32693</span><span class="operator">/</span><span class="type">TCP</span>   6d1h   app<span class="operator">=</span>nginx</span><br></pre></td></tr></table></figure>
+
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>与业界对比，</p>
+<ul>
+<li>AWS有类似方案，通过弹性网卡的方式实现了Pod直连。</li>
+<li>GKE（Google Kubernetes Engine）也有类似方案。结合CLB（Google Cloud Load Balancing）的NEG（Network Endpoint Groups）特性实现接入层直连Pod。</li>
+</ul>
+<p>现在腾讯云TKE也利用弹性网卡实现了Pod直连的网络模式，该功能现已上线。接下来，我们还计划对这个特性进行更多优化，包括</p>
+<ol>
+<li>不依赖VPC-ENI的网络模式，实现普通容器网络下的Pod直连。</li>
+<li>支持在Pod删除之前，摘除负载均衡后端。</li>
+</ol>
+<p>欢迎大家一起来使用！</p>
+<h2 id="相关参考"><a href="#相关参考" class="headerlink" title="相关参考"></a>相关参考</h2><p>[1] <strong>容器服务控制台</strong>: <em><a target="_blank" rel="noopener" href="https://console.cloud.tencent.com/tke2">https://console.cloud.tencent.com/tke2</a></em></p>
+<p>[2] <strong>创建 Service</strong> : <em><a target="_blank" rel="noopener" href="https://cloud.tencent.com/document/product/457/45489#.E5.88.9B.E5.BB.BA-service">https://cloud.tencent.com/document/product/457/45489#.E5.88.9B.E5.BB.BA-service</a></em></p>
+<p>[3] <strong>Kubernetes Service介绍</strong>: <em><a target="_blank" rel="noopener" href="https://kubernetes.io/docs/concepts/services-networking/service">https://kubernetes.io/docs/concepts/services-networking/service</a></em></p>
+<p>[4] <strong>Kubernetes Ingress介绍</strong>: <em><a target="_blank" rel="noopener" href="https://kubernetes.io/docs/concepts/services-networking/ingress">https://kubernetes.io/docs/concepts/services-networking/ingress</a></em></p>
+<p>[5] <strong>Kubernetes Deployments 滚动更新策略</strong>: <em><a target="_blank" rel="noopener" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy">https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy</a></em></p>
+<p>[6] <strong>Kubernetes Pods ReadinessGate特性</strong>: <em><a target="_blank" rel="noopener" href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-readiness-gate">https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-readiness-gate</a></em></p>
+<p>[7] <strong>Kubernetes 通过Local转发获取来源IP</strong>: <em><a target="_blank" rel="noopener" href="https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip">https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip</a></em></p>
+<p>[8] <strong>TKE容器服务 网络模式选型</strong>: <em><a target="_blank" rel="noopener" href="https://cloud.tencent.com/document/product/457/41636">https://cloud.tencent.com/document/product/457/41636</a></em></p>
+<p>[9] <strong>TKE容器服务 VPC-CNI网络模式</strong>: <em><a target="_blank" rel="noopener" href="https://cloud.tencent.com/document/product/457/34993">https://cloud.tencent.com/document/product/457/34993</a></em></p>
+<p>[10] <strong>TKE容器服务 配置kubectl并连接集群</strong>: <em><a target="_blank" rel="noopener" href="https://cloud.tencent.com/document/product/457/32191">https://cloud.tencent.com/document/product/457/32191</a></em></p>
+<p>[11] <strong>AWS ALB Ingress Controller</strong>: <em><a target="_blank" rel="noopener" href="https://aws.amazon.com/cn/blogs/opensource/kubernetes-ingress-aws-alb-ingress-controller/">https://aws.amazon.com/cn/blogs/opensource/kubernetes-ingress-aws-alb-ingress-controller/</a></em></p>
+<p>[12] <strong>GKE 通过独立 NEG 配置容器原生负载平衡</strong>: <em><a target="_blank" rel="noopener" href="https://cloud.google.com/kubernetes-engine/docs/how-to/standalone-neg">https://cloud.google.com/kubernetes-engine/docs/how-to/standalone-neg</a></em></p>
+<article class="message message-immersive is-primary">
+<div class="message-body">
+<i class="fas fa-globe-asia mr-2"></i>本文来自
+<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/fJtlm5Qjm2BfzekC4RegCQ">腾讯云原生</a>.
+</div>
+</article></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/Kubernetes/">Kubernetes</a></div><!--!--><div><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6757924689439593" crossOrigin="anonymous"></script><ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-6757924689439593" data-ad-slot="2352785969"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div></article></div><!--!--><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/pages/bytedance-yarn/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">YARN 在字节跳动的优化与实践</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/pages/knative-traffic/"><span class="level-item">一文了解Knative流量机制</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--><div style="width:100%"><script src="https://giscus.app/client.js" data-repo="thetechstack/thetechstack.github.io" data-repo-id="R_kgDOG6Ti1Q" data-category="Announcements" data-category-id="DIC_kwDOG6Ti1c4COQtm" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light" data-lang="zh-CN" crossOrigin="anonymous" async></script></div></div><!--!--><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen  order-3 is-sticky"><div class="card widget" id="toc" data-type="toc"><div class="card-content"><div class="menu"><h3 class="menu-label">目录</h3><ul class="menu-list"><li><a class="level is-mobile" href="#前言"><span class="level-left"><span class="level-item">1</span><span class="level-item">前言</span></span></a></li><li><a class="level is-mobile" href="#传统模式面临的问题与挑战"><span class="level-left"><span class="level-item">2</span><span class="level-item">传统模式面临的问题与挑战</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#性能与特性"><span class="level-left"><span class="level-item">2.1</span><span class="level-item">性能与特性</span></span></a></li><li><a class="level is-mobile" href="#业务可用性"><span class="level-left"><span class="level-item">2.2</span><span class="level-item">业务可用性</span></span></a></li><li><a class="level is-mobile" href="#负载均衡的控制面性能"><span class="level-left"><span class="level-item">2.3</span><span class="level-item">负载均衡的控制面性能</span></span></a></li></ul></li><li><a class="level is-mobile" href="#新旧模式对比"><span class="level-left"><span class="level-item">3</span><span class="level-item">新旧模式对比</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#控制面性能对比"><span class="level-left"><span class="level-item">3.1</span><span class="level-item">控制面性能对比</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#后端节点突增-应对集群扩容的场景"><span class="level-left"><span class="level-item">3.1.1</span><span class="level-item">后端节点突增 (应对集群扩容的场景)</span></span></a></li></ul></li><li><a class="level is-mobile" href="#负载均衡流量对比"><span class="level-left"><span class="level-item">3.2</span><span class="level-item">负载均衡流量对比</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#传统NodePort模式"><span class="level-left"><span class="level-item">3.2.1</span><span class="level-item">传统NodePort模式</span></span></a></li><li><a class="level is-mobile" href="#请求细节过程"><span class="level-left"><span class="level-item">3.2.2</span><span class="level-item">请求细节过程</span></span></a></li><li><a class="level is-mobile" href="#新的Pod直连模式"><span class="level-left"><span class="level-item">3.2.3</span><span class="level-item">新的Pod直连模式</span></span></a></li><li><a class="level is-mobile" href="#请求细节过程-1"><span class="level-left"><span class="level-item">3.2.4</span><span class="level-item">请求细节过程</span></span></a></li></ul></li><li><a class="level is-mobile" href="#直连与Local访问的区别"><span class="level-left"><span class="level-item">3.3</span><span class="level-item">直连与Local访问的区别</span></span></a></li><li><a class="level is-mobile" href="#ReadinessGate的引入"><span class="level-left"><span class="level-item">3.4</span><span class="level-item">ReadinessGate的引入</span></span></a></li><li><a class="level is-mobile" href="#QPS和网络时延对比"><span class="level-left"><span class="level-item">3.5</span><span class="level-item">QPS和网络时延对比</span></span></a></li><li><a class="level is-mobile" href="#KubeProxy的一些设计思考"><span class="level-left"><span class="level-item">3.6</span><span class="level-item">KubeProxy的一些设计思考</span></span></a></li></ul></li><li><a class="level is-mobile" href="#新模式使用指引"><span class="level-left"><span class="level-item">4</span><span class="level-item">新模式使用指引</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#前置要求"><span class="level-left"><span class="level-item">4.1</span><span class="level-item">前置要求</span></span></a></li><li><a class="level is-mobile" href="#控制台操作指引"><span class="level-left"><span class="level-item">4.2</span><span class="level-item">控制台操作指引</span></span></a></li><li><a class="level is-mobile" href="#Kubectl操作指引"><span class="level-left"><span class="level-item">4.3</span><span class="level-item">Kubectl操作指引</span></span></a></li></ul></li><li><a class="level is-mobile" href="#总结"><span class="level-left"><span class="level-item">5</span><span class="level-item">总结</span></span></a></li><li><a class="level is-mobile" href="#相关参考"><span class="level-left"><span class="level-item">6</span><span class="level-item">相关参考</span></span></a></li></ul></div></div><style>#toc .menu-list > li > a.is-active + .menu-list { display: block; }#toc .menu-list > li > a + .menu-list { display: none; }</style><script src="/js/toc.js" defer></script></div><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg"></figure><p class="is-size-6 is-block">公众号：面向问题编程</p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives"><p class="title">24</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories"><p class="title">4</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags"><p class="title">9</p></a></div></div></nav></div></div><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/"><span class="level-start"><span class="level-item">一文了解</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/"><span class="level-start"><span class="level-item">技术架构</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BB%BC%E8%BF%B0/"><span class="level-start"><span class="level-item">综述</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E9%97%AE%E9%A2%98/"><span class="level-start"><span class="level-item">问题</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li></ul></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a><p class="is-size-7"><span>&copy; 2022 面向问题编程</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-CN");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script type="text/x-mathjax-config">MathJax.Hub.Config({
+            'HTML-CSS': {
+                matchFontHeight: false
+            },
+            SVG: {
+                matchFontHeight: false
+            },
+            CommonHTML: {
+                matchFontHeight: false
+            },
+            tex2jax: {
+                inlineMath: [
+                    ['$','$'],
+                    ['\\(','\\)']
+                ]
+            }
+        });</script><script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.9/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script><!--!--><!--!--><!--!--><script src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script src="/js/insight.js" defer></script><script>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script></body></html>

@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><title>字节跳动基于 Serverless 的前端研发模式升级 - 面向问题编程</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="面向问题编程"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="面向问题编程"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="大家好，我叫王磊，来自于字节跳动 Web Infra，今天由我给大家分享《字节跳动基于 Serverless 的前端研发模式升级》。"><meta property="og:type" content="blog"><meta property="og:title" content="字节跳动基于 Serverless 的前端研发模式升级"><meta property="og:url" content="https://www.heapoverflow.cn/pages/bytedance-serverless-frontend/"><meta property="og:site_name" content="面向问题编程"><meta property="og:description" content="大家好，我叫王磊，来自于字节跳动 Web Infra，今天由我给大家分享《字节跳动基于 Serverless 的前端研发模式升级》。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://www.heapoverflow.cn/img/bytedance-serverless-frontend/0.jpg"><meta property="article:published_time" content="2022-03-26T05:25:31.511Z"><meta property="article:modified_time" content="2022-03-26T05:28:11.251Z"><meta property="article:author" content="面向问题编程"><meta property="article:tag" content="Serverless"><meta property="twitter:card" content="summary"><meta property="twitter:image" content="/img/bytedance-serverless-frontend/0.jpg"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.heapoverflow.cn/pages/bytedance-serverless-frontend/"},"headline":"字节跳动基于 Serverless 的前端研发模式升级","image":["https://www.heapoverflow.cn/img/bytedance-serverless-frontend/0.jpg"],"datePublished":"2022-03-26T05:25:31.511Z","dateModified":"2022-03-26T05:28:11.251Z","author":{"@type":"Person","name":"面向问题编程"},"publisher":{"@type":"Organization","name":"面向问题编程","logo":{"@type":"ImageObject","url":"https://www.heapoverflow.cn/img/logo.svg"}},"description":"大家好，我叫王磊，来自于字节跳动 Web Infra，今天由我给大家分享《字节跳动基于 Serverless 的前端研发模式升级》。"}</script><link rel="canonical" href="https://www.heapoverflow.cn/pages/bytedance-serverless-frontend/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><script src="https://www.googletagmanager.com/gtag/js?id=G-ETGL163DQH" async></script><script>window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    
+        gtag('config', 'G-ETGL163DQH');</script><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><script data-ad-client="ca-pub-6757924689439593" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+          Array
+              .from(document.querySelectorAll('.tab-content'))
+              .forEach($tab => {
+                  $tab.classList.add('is-hidden');
+              });
+          Array
+              .from(document.querySelectorAll('.tabs li'))
+              .forEach($tab => {
+                  $tab.classList.remove('is-active');
+              });
+          const $activeTab = document.querySelector(location.hash);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+          const $tabMenu = document.querySelector(`a[href="${location.hash}"]`);
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 6.0.0"></head><body class="is-2-column"><nav class="navbar navbar-main"><div class="container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/categories/%E9%97%AE%E9%A2%98/">问题</a><a class="navbar-item" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/">技术架构</a><a class="navbar-item" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></div><div class="navbar-end"><a class="navbar-item" rel="noopener" title="分类" href="/categories">分类</a><a class="navbar-item" rel="noopener" title="标签" href="/tags">标签</a><a class="navbar-item" rel="noopener" title="归档" href="/archives">归档</a><a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;"><i class="fas fa-list-ul"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-9-widescreen"><div class="card"><div class="card-image"><span class="image is-7by3"><img class="fill" src="/img/bytedance-serverless-frontend/0.jpg" alt="字节跳动基于 Serverless 的前端研发模式升级"></span></div><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-03-26T05:25:31.511Z" title="2022/3/26 下午1:25:31">2022-03-26</time>发表</span><span class="level-item"><time dateTime="2022-03-26T05:28:11.251Z" title="2022/3/26 下午1:28:11">2022-03-26</time>更新</span><span class="level-item">39 分钟读完 (大约5914个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">字节跳动基于 Serverless 的前端研发模式升级</h1><div class="content"><p>大家好，我叫王磊，来自于字节跳动 Web Infra，今天由我给大家分享《字节跳动基于 Serverless 的前端研发模式升级》。</p>
+<span id="more"></span>
+
+<p><img src="/img/bytedance-serverless-frontend/1.jpg"></p>
+<p>接下来将从以下 6 个方面介绍今天的内容，首先总结一下大前端时代下前端的职责和挑战。然后介绍字节跳动常见的业务形态，以及字节跳动传统的研发模式和挑战。之后介绍我们是如何基于 Serverless 对前端的研发模式进行升级的。为了保证稳定性，我们在监控运维方面也做了不少工作。最后简单做一下总结和展望。</p>
+<p><img src="/img/bytedance-serverless-frontend/2.jpg"></p>
+<p>首先让我们看下大前端时代下前端的职责和挑战，随着前端的演进，前端的职责在不断的变化。</p>
+<p><img src="/img/bytedance-serverless-frontend/3.jpg"></p>
+<p>PC 时代，我们的工作主要在于切图、写样式、写交互、兼容各种浏览器等，此外还会做一些组件化、前后端分离的事情，总体而言还是专注于浏览器领域。</p>
+<p><img src="/img/bytedance-serverless-frontend/4.jpg"></p>
+<p>随着移动设备的兴起，我们进入了移动互联网时代，整体工作分为跨端和工程 2 个方面。跨端主要做一些移动端 Web（H5）、React Native、Flutter 等工作；工程主要基于 Node 做一些方案。总体来看，这个阶段我们已经跨出了浏览器，迈向了 Android、iOS 和前端工程。</p>
+<p><img src="/img/bytedance-serverless-frontend/5.jpg"></p>
+<p>当下进入到 Serverless 时代，前端的工作变得更加丰富，包含 CSR、SSR、BFF、微前端等开发工作，从单端到多端，从 Client 端到服务器端，涉及的领域变得非常广，对前端要求变得更高，整体上是向着“前端全栈化”的方向发展。</p>
+<p><img src="/img/bytedance-serverless-frontend/6.jpg"></p>
+<p>在这种职责转变下，看下我们面临了哪些挑战。</p>
+<p>可以从 2 个角度来看，一个是知识体系，一个是工作内容。</p>
+<p>在知识体系上，除了传统前端知识 JS、CSS、Node，前端框架 React、Vue、打包工具 Webpack、Vite，微前端，跨端工程等。还会涉及后端领域，框架有大家熟悉的 Koa、Express；知识包含 Redis、消息中间件、文件存储、监控报警等。</p>
+<p>从工作内容上来看，也分为 2 块，一块是偏向前端的工作，一块是偏向后端的工作。偏向前端的工作有 写组件、写页面、兼容、性能优化、跨端工程等；偏向后端的工作有写 BFF、写 SSR、监控运维、集群管理等。</p>
+<p>整体上来看，前端向着全栈化的方向发展，涉及大量后端的知识和工作，对前端的挑战非常大。</p>
+<p><img src="/img/bytedance-serverless-frontend/7.jpg"></p>
+<p>在介绍完大前端时代下前端的职责和挑战后，让我们看下字节跳动有哪些常见的业务形态。</p>
+<p><img src="/img/bytedance-serverless-frontend/8.jpg"></p>
+<p>字节跳动常见的业务形态抽象成前端领域可以分为 4 个部分，其中 CSR 和微前端占大部分，CSR 是一些 C 端业务，微前端是一些中后台管理系统。此外还包含一些 SSR 页面和 BFF，SSR 是为了提升性能，解决首屏问题。BFF 主要解决前端 UI 模型和后端数据模型存在 Gap 的问题，主要写一些胶水代码。此外值得注意的是，字节跳动作为一家全球化的互联网公司，业务可能会部署到全球各地。</p>
+<p><img src="/img/bytedance-serverless-frontend/9.jpg"></p>
+<p>介绍完字节跳动常见的业务形态后，让我们看看字节跳动传统的研发模式以及遇到的问题。</p>
+<p><img src="/img/bytedance-serverless-frontend/10.jpg"></p>
+<p>拿一个包含 CSR + BFF 的项目举个例子。</p>
+<p><img src="/img/bytedance-serverless-frontend/11.jpg"></p>
+<p>从 CSR 讲起，针对一个 CSR 页面，我们除了开发业务，生成 CSS、JS、图片等静态资源和 HTML 之外，想要把页面部署到线上稳定运行，还需要开发很多基础服务。</p>
+<p>比如需要开发一个 CDN 上传服务，将静态资源上传到 CDN 上。此外还需要开发一个静态 Server 托管 HTML，静态 Server 可能包含文件服务、登陆认证、AB 灰度等功能。开发完毕后还不够，我们还需要申请机器和域名，把项目部署到集群里面，CSR 页面才能运行起来。</p>
+<p>想使用 BFF，需要开发一个 BFF 服务，这个服务可能包含权限管理、系统运维、域名接入等各种功能。同样需要申请机器和域名，把项目部署到集群里面。</p>
+<p>为了方便业务能够稳定上线，还需要开发一个部署系统，这个系统可能会包含 项目管理、发布系统、路由管理、AB 管理等功能。</p>
+<p>从工作内容上来看，针对一个简单的 CSR + BFF 业务，除了关心黄色方框中和业务相关的内容，还需要开发各种基础服务，对于前端同学实在太难了。</p>
+<p><img src="/img/bytedance-serverless-frontend/12.jpg"></p>
+<p>这种研发模式有什么问题呢？总结为以下 6 点：</p>
+<p>第一：研发成本高，不仅需开发业务，还需要开发基础服务；</p>
+<p>第二：运维成本高，需要关注 QPS、内存和机器数量等指标；</p>
+<p>第三：流量无法精准估计的情况下，需要准备充足的机器，资源使用率低，举一个线上真实的案例，从图中可以看出流量有明显的波动，需要准备比流量高峰还要多的机器，低峰时机器不能很好的被利用；</p>
+<p>第四：从人力上来看，对研发同学的能力要求会更高，由于招聘本身就很难，这样会进一步加大招聘的难度；</p>
+<p>第五：由于各种基础服务都是业务自己建设，很难像工程团队那样进行体系化建设，无法沉淀最佳实践；</p>
+<p>第六：这种研发模式不符合前端习惯，需要了解很多后端知识，对前端其实是非常不友好的。</p>
+<p><img src="/img/bytedance-serverless-frontend/13.jpg"></p>
+<p>为了解决这些问题，我们基于 Serverless 来对前端的研发模式进行了一次升级。</p>
+<p><img src="/img/bytedance-serverless-frontend/14.jpg"></p>
+<p>接下来将从以下 3 个方面去介绍，首先讲一下策略和架构。</p>
+<p><img src="/img/bytedance-serverless-frontend/15.jpg"></p>
+<p>在介绍我们的策略之前，先看下业界前辈们在 Serverless 方面做了哪些工作：首先是基础 FaaS 的建设，比如调度、冷启动等；然后是将现有 BaaS 服务和 FaaS 结合在一起，打造更好的生态；此外还有云函数、Node 框架、Runtime 等。综上所诉，可以发现前辈们主要还是在解决 Serverless 下的一些单点问题。</p>
+<p>在这些单点研究的基础上，我们的目标是围绕着前端的整个生命周期，构造前端 Serverless ，包含前端框架、研发流程、调试、部署、线上运行、监控运维等各个环节。用一句话来总结的话：基于 Serverless 打造一站式前端解决方案。</p>
+<p><img src="/img/bytedance-serverless-frontend/16.jpg"></p>
+<p>基于 Serverless 打造一站式前端解决方案有 2 个目标。</p>
+<p>第一：基础能力平台化，业务再也不需要关注前端基础服务的开发，平台提供，开箱即用，简单配置即可；</p>
+<p>第二：友好的开发体验，用户在开发 SSR 和 BFF 的过程中无需感知到差异性，和开发 CSR 一样轻松；此外支持 CSR 到 SSR、SSR 到 一体化 BFF、一体化 BFF 到微前端的渐进式开发。</p>
+<p><img src="/img/bytedance-serverless-frontend/17.jpg"></p>
+<p>首先介绍一下基础能力平台化，基础能力包含 5 个方面的内容。第一部署能力，支持微前端、SPA、MPA、SSR、一体化 BFF 、CDN 的部署。第二 提供 AB&#x2F;灰度能力，帮助前端进行上线前的验证和检测，帮助业务进行产品上的实验，这里有人群、百分比、客户端版本等策略。由于字节跳动是一家全球化的互联性公司，我们的业务需要支持全球化部署，比如国内、美国、新加坡等。出于稳定性的考虑，我们需要拥有完善的监控运维系统，包含日志、Metrics 打点、报警通知、指标大盘等。在前 4 个能力的基础上，为了提供更好的用户体验，需要和公司内部各个系统进行集成，比如工程方案、发布系统、一站式研发工作台等。</p>
+<p><img src="/img/bytedance-serverless-frontend/18.jpg"></p>
+<p>接下来介绍一下用户体验，想要支持 SSR 和 BFF，只需要简单配置和开发即可，在开发上和 CSR 没啥区别。比如用户想要支持 SSR，只需要开启一个配置；想要支持 BFF，添加一个 API 目录，写一写就行了。然后经过云编译，静态资源会自动上传到 CDN。HTML、SSR 、BFF 等产物经过发布控制台，简单配置一下即可上线。从研发流程来看，用户只需要关注红框框中的部分。用一句话来总结，我们希望传统前端 + 框架能力 + 平台能力 &#x3D; 全栈前端。</p>
+<p><img src="/img/bytedance-serverless-frontend/19.jpg"></p>
+<p>为了实现这些目标，我们需要做很多工作，具体分为 2 部分：“研发 &amp; 配置 &amp; 部署”和“线上运行”。</p>
+<p>先说第一个，左边部分，从下到上来介绍。最底层提供了一个部署系统，包含项目管理、路由管理、AB管理、监控报警等功能，支持 CSR、SSR、BFF 和微前端的发布。在上层我们有各种协议，比如开发协议、部署协议、SSR 协议、BFF 协议。在协议的基础上我们对接了公司内部的工程方案，比如 Jupiter 和 Modern.js。为了和公司内部各个系统更好的结合，我们抽象了接入层，里面提供 OPEN API、服务编排的原子服务、CLI 等。最后基于接入层打造上层产品，比如 Web 部署服务、一站式前端工作台、搭建系统或 DevOps 流水线服务等。</p>
+<p>接下来让我们介绍一下线上运行部分，这个我们从上到下进行介绍。当发起一个 HTTP 请求，首先会经过 统一接入层 到达我们的网关，这里我们会做限流、项目分发、AB 分流等相关的工作。经过网关会到底层各个服务，比如 静态 Web Server、SSR Server、BFF Server、微前端 Server 等。为了保障稳定性，我们提供了完备的监控报警，比如日志、打点等。下面是各种 BaaS 服务和 运行时，比如 Node 运行时，V8 运行时。最后是 FaaS 和 Node 基础 SDK。</p>
+<p><img src="/img/bytedance-serverless-frontend/20.jpg"></p>
+<p>在介绍完策略和架构之后，我们介绍一下 CI&#x2F;CD，这块我也做了不少工作。</p>
+<p><img src="/img/bytedance-serverless-frontend/21.jpg"></p>
+<p>这是一个简单的例子，当我们开发完代码后，首先会进行编译，之后经过一个代码检查，看看是否会有一些代码问题，比如是否符合 Lint，或者含有安全漏洞等。</p>
+<p>接下来通过 “线下、AB 或者灰度进行测试”，测试完毕之后需要经过一个人工卡点，确定没问题，会进行一些线上检查，比如 Lighthouse 的性能检查，这里也会有一个人工卡点。当确定没问题，就会把项目部署上线。</p>
+<p>由于这个是一个服务编排，用户可以按照自己的诉求进行个性化定制。</p>
+<p><img src="/img/bytedance-serverless-frontend/22.jpg"></p>
+<p>讲了这么多，可能会比较抽象，接下来举一些实际的例子来说明。</p>
+<p><img src="/img/bytedance-serverless-frontend/23.jpg"></p>
+<p>会从 CSR、SSR、一体化 BFF、微前端  4 个方面来讲，这里会重点突出 2 点。第一，无需感知 SSR、BFF 开发带来的差异 ，和 CSR 开发一样轻松；第二，支持 CSR 到 SSR 到一体化 BFF 再到微前端的渐进式开发。</p>
+<p><img src="/img/bytedance-serverless-frontend/24.jpg"></p>
+<p>先从 CSR 开始，左下角是一个很简单的例子，前端开发完，经过云编译，生成 CSS、JS 等静态文件上传到 CDN；此外会生成 2 份 HTML，一份是 ES5 的，一份是 ES6 的，通过部署控制台，经过简单配置就可以把代码发布上线了，整个过程用户只关注开发和配置就可以了。</p>
+<p><img src="/img/bytedance-serverless-frontend/25.jpg"></p>
+<p>这是我们的一个案例，左边是我们的系统，上线前只需要配置域名，指定某个项目下某个文件就可以了，然后点击“确定”，发布一下，就会生效。CSR 的项目在我们的系统上有很多，比如 “懂车帝”、“西瓜活动页”、“抖音活动页”等。</p>
+<p><img src="/img/bytedance-serverless-frontend/26.jpg"></p>
+<p>接下来介绍一下线上运行流程，分为 3 块。第一个是静态资源，直接访问 CDN 就可以了；第二个是 HTML，首先会进入到网关，进行 AB，项目分发，限流等处理，这时我们会知道访问的是哪个项目的哪个版本下的哪个文件，再经过 ES5、ES6 的识别，就可以访问到不同的 HTML 了。第三块有点特殊，浏览器的 Polyfill，我们这边提供了一个动态 Polyfill 服务，按需返回浏览器的 Polyfill，减少内容的大小，优化页面的性能。</p>
+<p><img src="/img/bytedance-serverless-frontend/27.jpg"></p>
+<p>CSR 介绍完了，让我们来看下 SSR。</p>
+<p><img src="/img/bytedance-serverless-frontend/28.jpg"></p>
+<p>假设我们已经有了一个 CSR 项目，想要支持 SSR，我们只需要经过一个简单配置就可以了，把 Server SSR 设为 true，在编译的时候会生成 SSR Runtime 和启动文件。如果我们的项目不是一个千人千面的项目，可以接受缓存，我们还可以在代码添加一个缓存组件，这时在编译产物中会多一个缓存配置。此外相较于 CSR，SSR 的项目在部署后会多一个 SSR Server。</p>
+<p><img src="/img/bytedance-serverless-frontend/29.jpg"></p>
+<p>同样，我们看下上线前的配置，很简单，把路由标记成 SSR 就可以了。SSR 项目有“广告的答题赢红包”、“大力智能神灯”和“头条热榜”等业务。</p>
+<p><img src="/img/bytedance-serverless-frontend/30.jpg"></p>
+<p>看下线上运行流程，访问 SSR，本质上是获取 HTML，请求会经过网关处理，到达“渲染处理”，这个时候看下缓存策略，如果可以缓存，看下 Redis 是否有缓存，有就直接返回，没有的话，通过服务发现访问 SSR Server。在异常或者超时的情况，会兜底到 Web Server 上获取 CSR 页面。</p>
+<p><img src="/img/bytedance-serverless-frontend/31.jpg"></p>
+<p>Ok，假设我们已经有了一个 SSR 项目，想支持 BFF，那么我们该怎么办呢？这就是我们接下来要介绍的一体化 BFF。</p>
+<p><img src="/img/bytedance-serverless-frontend/32.jpg"></p>
+<p>开发的时候，只需要在项目中添加一个 API 目录，把业务逻辑写好，使用的时候和前端开发一样，直接通过 import 将方法引入，调用就可以了。相较于 SSR，一体化项目在编译后会生成一个 BFF 的 Runtime，在部署后会多一个 BFF Server。</p>
+<p><img src="/img/bytedance-serverless-frontend/33.jpg"></p>
+<p>看一下例子，公司内部的一个“研发工作台”和我们的一个教育平台“你拍一”就是典型的案例。在配置上，前后端一体化项目和 SSR 是一样的，BFF Server 的发布是通过默认探测实现的。</p>
+<p><img src="/img/bytedance-serverless-frontend/34.jpg"></p>
+<p>运行时，相较于 SSR，一体化 BFF 多了 一个 BFF Server，在 SSR 的时候，我们会通过 RPC 进行调用，在 CSR 的时候会通过 HTTP 方式进行调用。</p>
+<p><img src="/img/bytedance-serverless-frontend/35.jpg"></p>
+<p>介绍完了前面的 CSR、SSR 和一体化 BFF 项目，最后介绍一下微前端。</p>
+<p><img src="/img/bytedance-serverless-frontend/36.jpg"></p>
+<p>假设我们已经有了一些项目，开始只有 1 - 2 个同学维护，随着业务的不断发展，项目变得越来越复杂，需要 10 个乃至上百个同学、甚至跨团队开发，不同团队使用的技术体系可能还不一样。这样一个原本的小项目就变成了一个巨石应用，开发和维护的成本就变得非常高，那我们该怎么去解决现有问题?</p>
+<p>微前端会是一种比较好的选择，我们团队提供了一套解决方案 —— Garfish，它解决了跨团队协作难、技术体系多样化、复杂度日益上升等问题。从架构层面出发可以将多个独立交付的前端应用组成一个整体，这些前端应用能够 “<strong>独立开发”</strong>、<strong>“独立测试”</strong>、<strong>“独立部署”</strong>，但在终端用户来看却是一个内聚的产品。目前 Garfish 已经开源了，大家有兴趣可以去了解一下 <a target="_blank" rel="noopener" href="https://github.com/bytedance/garfish%E3%80%82">https://github.com/bytedance/garfish。</a></p>
+<p>那么我们如何把现有项目，变成一个微前端呢？只需要开发一个主工程，注册子工程信息，在运行时交给框架即可。</p>
+<p><img src="/img/bytedance-serverless-frontend/37.jpg"></p>
+<p>让我们看一下开发流程啊，由于是微前端，需要分为主工程和子工程，子工程可以是前面介绍的 CSR、SSR、一体化 BFF 项目的任何一种。主工程也可以是 CSR、SSR、一体化 BFF 项目的任何一种，开发流程和前面介绍的一样，唯一不同的是，在发布控制台需要配置“主子模块关系”和“微前端菜单”等。</p>
+<p><img src="/img/bytedance-serverless-frontend/38.jpg"></p>
+<p><img src="/img/bytedance-serverless-frontend/39.jpg"></p>
+<p>看下配置界面，这是一个主工程，下面挂载了 3 个子工程，然后可以配置主工程的菜单。</p>
+<p><img src="/img/bytedance-serverless-frontend/40.jpg"></p>
+<p>看一些正式的案例，比如幸福里的后台管理系统，我们公司的 toB 项目，火山引擎等。</p>
+<p><img src="/img/bytedance-serverless-frontend/41.jpg"></p>
+<p>运行过程也比较简单，当请求进来的时候，先是主应用，进入网关处理，获取 HTML。与此同时请求微前端 Server 获取“主子模块关系”和菜单等，获取后注入到 HTML，避免在浏览器多发一次 HTTP 请求，优化一下性能。返回到浏览器后，判断当前需要访问哪个子应用，获取即可。</p>
+<p><img src="/img/bytedance-serverless-frontend/42.jpg"></p>
+<p>功能实现了，稳定性这块也是非常重要的，这块我们也做了很多的工作，主要在监控运维方面。</p>
+<p><img src="/img/bytedance-serverless-frontend/43.jpg"></p>
+<p>这块分为 3 个部分，第一部分是业务需要关注的，后面 2 个是我们系统维护者需要关注的。</p>
+<p><img src="/img/bytedance-serverless-frontend/44.jpg"></p>
+<p>用户可以在系统内进行一些简单的配置，比如 404、5xx、SSR 降级的 QPS 阈值，超过阈值后就会在飞书（打个广告，飞书体验&amp;功能超赞）上收到报警通知，并提供了文档，帮助用户排查问题。</p>
+<p><img src="/img/bytedance-serverless-frontend/45.jpg"></p>
+<p>另外我们提供了一个业务指标大盘，这里可以看到项目的 QPS，访问耗时，SSR 渲染耗时等数据。</p>
+<p><img src="/img/bytedance-serverless-frontend/46.jpg"></p>
+<p>接下来介绍一下日志系统。</p>
+<p><img src="/img/bytedance-serverless-frontend/47.jpg"></p>
+<p><img src="/img/bytedance-serverless-frontend/48.jpg"></p>
+<p><img src="/img/bytedance-serverless-frontend/49.jpg"></p>
+<p>为了帮助排查问题，和公司内部的日志系统打通，可以通过关键字查询，对日志进行聚类分析，也可以调查某次调用过程中整条链路上的日志。</p>
+<p><img src="/img/bytedance-serverless-frontend/50.jpg"></p>
+<p>最后对于服务的运行时监控和调试，我们也做了不少工作。</p>
+<p><img src="/img/bytedance-serverless-frontend/51.jpg"></p>
+<p><img src="/img/bytedance-serverless-frontend/52.jpg"></p>
+<p><img src="/img/bytedance-serverless-frontend/53.jpg"></p>
+<p>团队内做了一个类似 alinode 的产品，这里可以查看 Node 运行时的各种指标数据，比如内存、CPU、GC 情况等；此外如果通过日志排查问题比较困难，可以通过断点调试的方式进行调查；如果发现有内存泄漏或者性能问题，可以通过 Snapshot 或者 CPU Profile 进行分析。</p>
+<p><img src="/img/bytedance-serverless-frontend/54.jpg"></p>
+<p>最后做一个简单的总结和展望。</p>
+<p><img src="/img/bytedance-serverless-frontend/55.jpg"></p>
+<p>对于 Serverless 方向，个人觉得将来会朝着 3 个方向去发展，第一个是 Runtime 部分，这块主要解决 FaaS 冷启问题，更好应对突发流量问题；第二是 FaaS + BaaS，更好的完善 Serverless 的生态；第三是 Serverless+，在 FaaS + BasS 的基础上，构建各种从框架 - 开发 - 部署 - 线上运行的应用视角的一站式研发平台。</p>
+<p><img src="/img/bytedance-serverless-frontend/56.jpg"></p>
+<p>最后我们来做一个总结，今天主要介绍了我们字节跳动是如何基于 Serverless 进行前端研发模式升级的，希望这次分享能够对大家有所帮助，在自己的业务场景中遇到了类似的问题，有所启发。非常感谢。</p>
+<p><img src="/img/bytedance-serverless-frontend/57.jpg"></p>
+<article class="message message-immersive is-primary">
+<div class="message-body">
+<i class="fas fa-globe-asia mr-2"></i>本文来自
+<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/J2fHm_mR7UE65q1vSQ9xpA">ByteDance Web Infra</a>.
+</div>
+</article></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/Serverless/">Serverless</a></div><!--!--><div><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6757924689439593" crossOrigin="anonymous"></script><ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-6757924689439593" data-ad-slot="2352785969"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div></article></div><!--!--><nav class="post-navigation mt-4 level is-mobile"><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/pages/bytedance-yarn/"><span class="level-item">YARN 在字节跳动的优化与实践</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--><div style="width:100%"><script src="https://giscus.app/client.js" data-repo="thetechstack/thetechstack.github.io" data-repo-id="R_kgDOG6Ti1Q" data-category="Announcements" data-category-id="DIC_kwDOG6Ti1c4COQtm" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light" data-lang="zh-CN" crossOrigin="anonymous" async></script></div></div><!--!--><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen  order-3 is-sticky"><!--!--><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg"></figure><p class="is-size-6 is-block">公众号：面向问题编程</p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives"><p class="title">24</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories"><p class="title">4</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags"><p class="title">9</p></a></div></div></nav></div></div><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/"><span class="level-start"><span class="level-item">一文了解</span></span><span class="level-end"><span class="level-item tag">5</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/"><span class="level-start"><span class="level-item">技术架构</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BB%BC%E8%BF%B0/"><span class="level-start"><span class="level-item">综述</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E9%97%AE%E9%A2%98/"><span class="level-start"><span class="level-item">问题</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li></ul></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a><p class="is-size-7"><span>&copy; 2022 面向问题编程</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-CN");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script type="text/x-mathjax-config">MathJax.Hub.Config({
+            'HTML-CSS': {
+                matchFontHeight: false
+            },
+            SVG: {
+                matchFontHeight: false
+            },
+            CommonHTML: {
+                matchFontHeight: false
+            },
+            tex2jax: {
+                inlineMath: [
+                    ['$','$'],
+                    ['\\(','\\)']
+                ]
+            }
+        });</script><script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.9/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script><!--!--><!--!--><!--!--><script src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script src="/js/insight.js" defer></script><script>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script></body></html>
