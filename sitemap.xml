@@ -2,7 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <url>
-    <loc>https://www.heapoverflow.cn/pages/wiki-linux-network-recv/</loc>
+    <loc>https://www.heapoverflow.cn/pages/wiki-linux-network-veth/</loc>
     
     <lastmod>2022-03-27</lastmod>
     
@@ -12,6 +12,33 @@
   
   <url>
     <loc>https://www.heapoverflow.cn/pages/wiki-linux-network/</loc>
+    
+    <lastmod>2022-03-27</lastmod>
+    
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <url>
+    <loc>https://www.heapoverflow.cn/pages/wiki-linux-network-bridge/</loc>
+    
+    <lastmod>2022-03-27</lastmod>
+    
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <url>
+    <loc>https://www.heapoverflow.cn/pages/wiki-linux-network-namespace/</loc>
+    
+    <lastmod>2022-03-27</lastmod>
+    
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <url>
+    <loc>https://www.heapoverflow.cn/pages/wiki-linux-network-recv/</loc>
     
     <lastmod>2022-03-27</lastmod>
     
@@ -254,14 +281,14 @@
 
   
   <url>
-    <loc>https://www.heapoverflow.cn/tags/Serverless/</loc>
+    <loc>https://www.heapoverflow.cn/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/</loc>
     <lastmod>2022-03-27</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.2</priority>
   </url>
   
   <url>
-    <loc>https://www.heapoverflow.cn/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/</loc>
+    <loc>https://www.heapoverflow.cn/tags/Serverless/</loc>
     <lastmod>2022-03-27</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.2</priority>
