@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><title>一文了解虚拟私有云VPC的实现 - 面向问题编程</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="面向问题编程"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="面向问题编程"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="大家好，我是二哥。新年第一篇肝文来了。在开始之前，我们先来看看下面几个问题：  XX云上租用VM，你一定会碰到VPC。你是否好奇过VPC到底是如何实现的？ 你在XX云上租用的VM和别人家的VM跑在一台物理机上，它们之间的网络流量又是如何被隔离的？ 你的1000个K8s Pod分散在50个VM上，这50个VM又散落在10个物理机上，那这些Pod之间通信时，数据包是如何跨物理机流动的？  来吧，进入正"><meta property="og:type" content="blog"><meta property="og:title" content="一文了解虚拟私有云VPC的实现"><meta property="og:url" content="https://www.heapoverflow.cn/pages/wiki-vpc/"><meta property="og:site_name" content="面向问题编程"><meta property="og:description" content="大家好，我是二哥。新年第一篇肝文来了。在开始之前，我们先来看看下面几个问题：  XX云上租用VM，你一定会碰到VPC。你是否好奇过VPC到底是如何实现的？ 你在XX云上租用的VM和别人家的VM跑在一台物理机上，它们之间的网络流量又是如何被隔离的？ 你的1000个K8s Pod分散在50个VM上，这50个VM又散落在10个物理机上，那这些Pod之间通信时，数据包是如何跨物理机流动的？  来吧，进入正"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://www.heapoverflow.cn/img/wiki-vpc/7.jpg"><meta property="article:published_time" content="2022-03-31T09:17:00.721Z"><meta property="article:modified_time" content="2022-03-31T09:50:40.245Z"><meta property="article:author" content="面向问题编程"><meta property="article:tag" content="Linux网络"><meta property="article:tag" content="网络虚拟化"><meta property="twitter:card" content="summary"><meta property="twitter:image" content="/img/wiki-vpc/7.jpg"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.heapoverflow.cn/pages/wiki-vpc/"},"headline":"一文了解虚拟私有云VPC的实现","image":["https://www.heapoverflow.cn/img/wiki-vpc/7.jpg"],"datePublished":"2022-03-31T09:17:00.721Z","dateModified":"2022-03-31T09:50:40.245Z","author":{"@type":"Person","name":"面向问题编程"},"publisher":{"@type":"Organization","name":"面向问题编程","logo":{"@type":"ImageObject","url":"https://www.heapoverflow.cn/img/logo.svg"}},"description":"大家好，我是二哥。新年第一篇肝文来了。在开始之前，我们先来看看下面几个问题：  XX云上租用VM，你一定会碰到VPC。你是否好奇过VPC到底是如何实现的？ 你在XX云上租用的VM和别人家的VM跑在一台物理机上，它们之间的网络流量又是如何被隔离的？ 你的1000个K8s Pod分散在50个VM上，这50个VM又散落在10个物理机上，那这些Pod之间通信时，数据包是如何跨物理机流动的？  来吧，进入正"}</script><link rel="canonical" href="https://www.heapoverflow.cn/pages/wiki-vpc/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><script src="https://www.googletagmanager.com/gtag/js?id=G-ETGL163DQH" async></script><script>window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    
+        gtag('config', 'G-ETGL163DQH');</script><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><script data-ad-client="ca-pub-6757924689439593" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+          Array
+              .from(document.querySelectorAll('.tab-content'))
+              .forEach($tab => {
+                  $tab.classList.add('is-hidden');
+              });
+          Array
+              .from(document.querySelectorAll('.tabs li'))
+              .forEach($tab => {
+                  $tab.classList.remove('is-active');
+              });
+          const $activeTab = document.querySelector(location.hash);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+          const $tabMenu = document.querySelector(`a[href="${location.hash}"]`);
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 6.0.0"></head><body class="is-2-column"><nav class="navbar navbar-main"><div class="container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/categories/%E9%97%AE%E9%A2%98/">问题</a><a class="navbar-item" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/">技术架构</a><a class="navbar-item" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></div><div class="navbar-end"><a class="navbar-item" rel="noopener" title="分类" href="/categories">分类</a><a class="navbar-item" rel="noopener" title="标签" href="/tags">标签</a><a class="navbar-item" rel="noopener" title="归档" href="/archives">归档</a><a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;"><i class="fas fa-list-ul"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-9-widescreen"><div class="card"><div class="card-image"><span class="image is-7by3"><img class="fill" src="/img/wiki-vpc/7.jpg" alt="一文了解虚拟私有云VPC的实现"></span></div><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-03-31T09:17:00.721Z" title="2022/3/31 下午5:17:00">2022-03-31</time>发表</span><span class="level-item"><time dateTime="2022-03-31T09:50:40.245Z" title="2022/3/31 下午5:50:40">2022-03-31</time>更新</span><span class="level-item"><a class="link-muted" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></span><span class="level-item">26 分钟读完 (大约3830个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">一文了解虚拟私有云VPC的实现</h1><div class="content"><p>大家好，我是二哥。新年第一篇肝文来了。在开始之前，我们先来看看下面几个问题：</p>
+<ul>
+<li>XX云上租用VM，你一定会碰到VPC。你是否好奇过VPC到底是如何实现的？</li>
+<li>你在XX云上租用的VM和别人家的VM跑在一台物理机上，它们之间的网络流量又是如何被隔离的？</li>
+<li>你的1000个K8s Pod分散在50个VM上，这50个VM又散落在10个物理机上，那这些Pod之间通信时，数据包是如何跨物理机流动的？</li>
+</ul>
+<p>来吧，进入正题。</p>
+<span id="more"></span> 
+<h3 id="1-数据中心网络拓扑回顾"><a href="#1-数据中心网络拓扑回顾" class="headerlink" title="1. 数据中心网络拓扑回顾"></a>1. 数据中心网络拓扑回顾</h3><p>在文章《广角-聊聊Underlay》中，二哥用一张大图画出了实现K8s“扁平网络”的三种典型实现方式：Overlay、主机间路由（host-gw）以及Underlay。</p>
+<p>无论采用什么模式，K8s都需要寄生于宿主机的既有网络也即underlay network。图1所示的underlay network包括三个可用区。这三个可用区统一接进核心交换机。每个可用区里面装有若干个机架，一般在机架顶上会有接入交换机将机架上的物理机接进网络。接入交换机连接到性能更高的汇聚交换机，进而通过核心交换机、核心路由器、边界路由器连接到internet。在国内，这个internet由我们熟知的电信、联通等宽带运营商组成。</p>
+<p>你一定发现了在图1的可用区A里，我标示出了VPC（Virtual Private Cloud），但那篇文章里没有做过多解释。二哥捂到现在，憋不住了。</p>
+<p><img src="/img/wiki-vpc/0.jpg"></p>
+<p>图 1：数据中心拓扑及K8s扁平网络三种模式示意图  </p>
+<h3 id="2-从VLAN到VXLAN"><a href="#2-从VLAN到VXLAN" class="headerlink" title="2. 从VLAN到VXLAN"></a>2. 从VLAN到VXLAN</h3><h4 id="2-1-VLAN"><a href="#2-1-VLAN" class="headerlink" title="2.1 VLAN"></a>2.1 VLAN</h4><p>在谈VXLAN之前，我们先来看一个名字与它非常像的词：VLAN（Virtual LAN，虚拟局域网）。</p>
+<p>大家在上大学的时候一定有过这个经验：用交换机在宿舍组一个局域网玩《魔兽争霸》。连接到这个交换机上的几台电脑处于同一个局域网，电脑之间的通信经由交换机负责转发。其实企业也是类似，只不过企业用的是更高级的、性能更好的、可以连接更多电脑的交换机。交换机用起来方便是方便，但它有一些问题：</p>
+<ul>
+<li>它总是会把广播消息转发给所有的电脑。</li>
+<li>如果大家按职能部门分楼层或分区域坐，就会出现有的交换机端口不够用，有的交换机却又空着一大片端口的现象。</li>
+</ul>
+<p>如果把大家混着坐，共用这些交换机端口，又该如何保证不同职能部门之间的网络隔离呢？</p>
+<p>聪明的IT工程师一拍大腿：简单啊，上VLAN啊。把所有交换机的LAN口归拢在一起，把它们按职能部门分类编码。比如给Sales部门编码10，给Accounting部门编码20，Research部门编码30。虽然他们都如图2一样混插在交换机上，但如果按照编码来分类，逻辑上就清晰多了。再对比看看图3的VLAN逻辑视图，是不是舒服很多？</p>
+<p><img src="/img/wiki-vpc/1.jpg"></p>
+<p>图 2：LAN物理视图  </p>
+<p><img src="/img/wiki-vpc/2.jpg"></p>
+<p>图 3：VLAN物理和逻辑视图  </p>
+<p>这个编码放在网络包哪里呢？如下图所示，新加一个802.1Q Tag就行了。这样交换机在解析这个包的时候，只有VLAN ID相同的包才会相互转发。当然，因为这个Tag是新加的，得交换机认识才行。</p>
+<p><img src="/img/wiki-vpc/3.jpg"></p>
+<p>图 4：带VLAN头的二层网络包对比示意图  </p>
+<p>你看看VLAN ID，总共12位，那就是说最多能支持4096个ID，这应付一个企业的日常组网需求足够了。</p>
+<h4 id="2-2-趣谈隧道协议"><a href="#2-2-趣谈隧道协议" class="headerlink" title="2.2 趣谈隧道协议"></a>2.2 趣谈隧道协议</h4><p>我想借助刘超在《趣谈网络协议》中举的从广州自驾海南游的一个例子来说明所谓隧道协议的概念。如图5所示，隧道协议分为三部分：乘客协议、隧道协议和承载协议。</p>
+<p><img src="/img/wiki-vpc/4.jpg"></p>
+<p>图 5：隧道协议示意图  </p>
+<p>从广州出发自驾游海南，你的车怎么通过琼州海峡呢？得用轮渡，其实这就是隧道协议。</p>
+<p>在广州这边开车是有“协议”的，例如靠右行驶、红灯停、绿灯行，这个就相当于“被封装”的乘客协议。海南那面，开车也是同样的“乘客”协议。</p>
+<p>那我的车如何从广州运到海南呢？这就需要你先遵循开车协议，将车开上轮渡，所有车都关在船舱里面，按照既定的规则排列好，这就是隧道协议。在大海上，你的车是关在船舱里面的，就像在隧道里面一样，这个时候内部的乘客协议，也即驾驶协议没啥用处，只需要船遵从外层的承载协议，到达海南就可以了。</p>
+<p>在海上坐船航行，也有它的协议，例如要看灯塔、要按航道航行等。这就是外层的承载协议。</p>
+<p>到达之后，外部承载协议的任务就结束了，打开船舱，将车开出来，就相当于取下承载协议和隧道协议的头。接下来，在海南该怎么开车，就怎么开车，还是内部的乘客协议起作用。</p>
+<h4 id="2-3-VXLAN"><a href="#2-3-VXLAN" class="headerlink" title="2.3 VXLAN"></a>2.3 VXLAN</h4><p>VLAN看起来用得也凑合，大家按照既有技术和工作模式，在各自行当里埋头苦干，砥砺前行。直到有一天，一家叫做谷歌的公司发布了3篇产品设计论文，并颠覆性地提出“Google 101”计划，正式创造了“云”的概念。在2006年，亚马逊发布了AWS，凭借高效的系统利用率、方便的VM租赁方式、灵活的和可扩展的优势彻底颠覆了企业IT建设方式。</p>
+<p>服务器虚拟化作为云计算的核心技术之一，一方面演变出了各类云产品供企业上云使用，另一方面却在多租户网络隔离问题上给云计算厂商出了一道难题：VLAN总共才能支持4096个ID，该如何满足大型数据中心的多租户间隔离需求呢？</p>
+<p>修改VLAN协议？别逗了，这是一个不可能完成的工程，因为没有办法更新已经遍布全球的、正在工作中的交换机固件。可选套路就两种：要不就是来一个新版本的VLAN，兼容老的版本，老设备用老协议，新设备用新协议，渐进式升级，慢慢过渡；要不就是另起炉灶，重新搞一套，这不VXLAN（Virtual eXtensible Local Area Network，虚拟扩展局域网）由此诞生。</p>
+<p><img src="/img/wiki-vpc/5.jpg"></p>
+<p>图 6：VXLAN数据帧  </p>
+<p>上图所示的VXLAN数据帧中，“Original Layer 2 Frame”就像是图5中提到的乘客协议，而VXLAN头如同我们说的隧道协议，Outer UDP头+Outer IP头+Outer MAC头则对应承载协议。</p>
+<p>虽然从名字上看，VXLAN是VLAN的一种扩展协议，但其实它和VLAN完全不兼容。一句话来总结：VXLAN是一个隧道协议，利用一种协议来传输另外一种协议。</p>
+<p><img src="/img/wiki-vpc/6.jpg"></p>
+<p>图 7：VXLAN网络模型示意图</p>
+<p>了解了隧道协议，我们来结合图7看看VXLAN是如何在IP网络中模拟出一个隧道的。图中的TOR全称是Top Of Rack，就是机架顶端的意思。在机架顶端的交换机上运行有一个VTEP（VXLAN Tunnel End Point，虚拟隧道端点），它是VXLAN隧道的起点和终点，VXLAN对用户原始数据帧的封装和解封装均在VTEP上进行。</p>
+<ul>
+<li>源VM发出的原始数据帧，在左端VTEP上被封装成VXLAN格式的报文，并塞进UDP payload中。</li>
+<li>报文通过UDP协议在IP网络中传递到右端VTEP上。</li>
+<li>右端VTEP解封装还原出原始的数据帧，最后转发给目的VM。</li>
+</ul>
+<p>虽然实际上网络包还是在IP网络中传输的，通信双方分别是源IP 1.1.1.1和目的IP 2.2.2.2这两个VTEP，但是从躲在这两个VTEP后面的VM的眼中看来，就好像它俩之间有一个隧道，源数据从隧道这端塞进去，那端就能原样收到了。</p>
+<h3 id="3-VPC是如何实现的"><a href="#3-VPC是如何实现的" class="headerlink" title="3. VPC是如何实现的"></a>3. VPC是如何实现的</h3><p><img src="/img/wiki-vpc/7.jpg"></p>
+<p>图 8：VXLAN实现VPC和K8s Overlay扁平网络模型示意图  </p>
+<p>VXLAN一方面完美地弥补了前面提到的VLAN只能提供4096个ID这个硬伤，通过提供24位VNID字段，提供多达16M个标识能力，远大于VLAN的4096。</p>
+<p>另一方面，它可以构建一条穿越数据中心基础IP网络的虚拟隧道，将数据中心网络虚拟成一个巨型“二层交换机”。我们借助图8来看看这个过程的详情。</p>
+<p>二哥首先来把图8所包含的基本要素介绍一遍。机架填满了物理机。每个物理机上均装有Open vSwitch（后文简称OVS）。物理机上所有的VM都连接到了这些OVS上。你一定注意到了虚拟机里面还标示出了Pod、CNI、kubelet，别急，这个后文再讲。</p>
+<p>这些物理机所在的网段为10.1.5.7&#x2F;16，VM按颜色分成了两个不同的网段和VXLAN ID：淡橙色部分的VM网段为172.20.6.35&#x2F;16，VXLAN ID为1234；蓝色部分的网段为172.10.5.25&#x2F;16，VXLAN ID为5678。除所在宿主机外，VM无法和其它物理机直接通信。</p>
+<p>我们在XX云上创建VM的时候，会被要求设置一个VPC，还可以向这个VPC里添加多个VM。这些VM一定是散落地分布在不同的物理机上的。那么问题来了：我的VM和别人家的VM在一台物理机器上，它俩会串台不？我的多台VM分布在不同的物理机上，又是如何做到既能相互之间通信又能和别人家的隔离的呢？</p>
+<p>答案无它，秘密藏在VXLAN里。OVS支持GRE、VXLAN等隧道协议，这里我们以VXLAN来举例。图8中物理机上安装的每个OVS都有一个VTEP。VTEP是VXLAN网络中绝对的主角，它既可以是一台独立的网络设备（比如图7中位于TOR上的接入交换机），也可以在服务器中的虚拟交换机中（比如图8的OVS）。</p>
+<p>源VM发出的原始数据帧如同图5中的小汽车，我们将它封装成VXLAN格式的报文就如同把小汽车放到渡轮船舱，而UDP载着VXLAN格式穿过IP网络就类似装着一肚子小汽车的渡轮穿过琼州海峡。在另一个VTEP上解封装还原出原始的数据帧就好比轮渡到了海峡对岸后卸货的过程。</p>
+<p>想象一下你坐在小车里，一路体验这个奇妙的旅程。无论在广州开车还是在海南自驾，交规完全一致，对你而言就像是穿过隧道一样，从位于大陆的一个城市切换到了另一个位于海岛上的城市。</p>
+<p>对数据帧而言也是如此。数据帧如同你和你的小汽车，VM如同城市，而VTEP就是那个隧道。</p>
+<p>通过建立如图8中的粉色VTEP隧道，我们解决了位于不同物理机上的VM之间的数据通信问题。那隔离问题是如何解决的呢？</p>
+<p>还记得图2和图3中的VLAN以及VLAN ID的作用吗？是的，类似地，VXLAN ID用来解决隔离问题。不同的VPC使用不同的VXLAN ID来相互区分和隔离。不同的VXLAN ID就像不同的轮渡船，只有具有相同ID的小汽车才可以装载到同一个轮渡船上。</p>
+<p>利用隧道和VXLAN ID技术，图8中的VM被分隔成了两类，一类是淡橙色，一类是蓝色。它们在各自的网段内自由飞翔，不同的网段之间如同两条铁轨一样平行永不相交。</p>
+<h3 id="4-当VPC遇到K8s-Overlay"><a href="#4-当VPC遇到K8s-Overlay" class="headerlink" title="4. 当VPC遇到K8s Overlay"></a>4. 当VPC遇到K8s Overlay</h3><p>二哥之前在《特洛伊木马-图解VXLAN容器网络通信方案》中详细讲述了K8s扁平网路模型的典型实现方式之一：Overlay方案。这个方案的细节如图9所示。2015年上映的《蚁人》看过吧？现在我们将图9如同蚁人缩小物体一样缩小到图8的K8s中。</p>
+<p><img src="/img/wiki-vpc/8.jpg"></p>
+<p>图 9：K8s VXLAN容器网络方案  </p>
+<p>虽说K8s的网络是扁平的，但这种扁平是通过图8中的灰绿色的VXLAN隧道和图9所示的VXLAN隧道虚拟出来的。从Pod和容器的视角看，它是一个扁平的网络，可是它们又怎么可能会晓得外面的世界却是那么的复杂、雄伟和壮观。</p>
+<p>当VPC和K8s Overlay相遇后，Pod之间通信的网络包就如同俄罗斯套娃一样，被一层又一层地包裹住。</p>
+<p>在VPC和K8s的精心设计和呵护下，容器们会觉得它们彼此之间通信如此的简单，可是它们又怎么会知道每一次say hello都可能包装千次万遍，走过千山万水。</p>
+<p>写到这里，突然想起来在学术界，一直有一种观点，那就是我们人类生活的这个世界，乃至整个宇宙，可能都是被某个更智慧的物体模拟出来的虚拟世界。嗯，或许我们也和这些Pod还有容器一样，活在虚幻的、被别人定义的世界里。</p>
+<article class="message message-immersive is-primary">
+<div class="message-body">
+<i class="fas fa-globe-asia mr-2"></i>本文来自
+<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/b-jr2BEsBYs7AEHFdVAvPw">二哥聊云原生</a>.
+</div>
+</article>
+</div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/Linux%E7%BD%91%E7%BB%9C/">Linux网络</a><a class="link-muted mr-2" rel="tag" href="/tags/%E7%BD%91%E7%BB%9C%E8%99%9A%E6%8B%9F%E5%8C%96/">网络虚拟化</a></div><!--!--><div><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6757924689439593" crossOrigin="anonymous"></script><ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-6757924689439593" data-ad-slot="2352785969"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div></article></div><!--!--><nav class="post-navigation mt-4 level is-mobile"><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/pages/wiki-flannel/"><span class="level-item">一文了解k8s扁平化网络Flannel</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--><div style="width:100%"><script src="https://giscus.app/client.js" data-repo="thetechstack/thetechstack.github.io" data-repo-id="R_kgDOG6Ti1Q" data-category="Announcements" data-category-id="DIC_kwDOG6Ti1c4COQtm" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light" data-lang="zh-CN" crossOrigin="anonymous" async></script></div></div><!--!--><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen  order-3 is-sticky"><div class="card widget" id="toc" data-type="toc"><div class="card-content"><div class="menu"><h3 class="menu-label">目录</h3><ul class="menu-list"><li><a class="level is-mobile" href="#1-数据中心网络拓扑回顾"><span class="level-left"><span class="level-item">1</span><span class="level-item">1. 数据中心网络拓扑回顾</span></span></a></li><li><a class="level is-mobile" href="#2-从VLAN到VXLAN"><span class="level-left"><span class="level-item">2</span><span class="level-item">2. 从VLAN到VXLAN</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#2-1-VLAN"><span class="level-left"><span class="level-item">2.1</span><span class="level-item">2.1 VLAN</span></span></a></li><li><a class="level is-mobile" href="#2-2-趣谈隧道协议"><span class="level-left"><span class="level-item">2.2</span><span class="level-item">2.2 趣谈隧道协议</span></span></a></li><li><a class="level is-mobile" href="#2-3-VXLAN"><span class="level-left"><span class="level-item">2.3</span><span class="level-item">2.3 VXLAN</span></span></a></li></ul></li><li><a class="level is-mobile" href="#3-VPC是如何实现的"><span class="level-left"><span class="level-item">3</span><span class="level-item">3. VPC是如何实现的</span></span></a></li><li><a class="level is-mobile" href="#4-当VPC遇到K8s-Overlay"><span class="level-left"><span class="level-item">4</span><span class="level-item">4. 当VPC遇到K8s Overlay</span></span></a></li></ul></div></div><style>#toc .menu-list > li > a.is-active + .menu-list { display: block; }#toc .menu-list > li > a + .menu-list { display: none; }</style><script src="/js/toc.js" defer></script></div><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg"></figure><p class="is-size-6 is-block">公众号：面向问题编程</p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives"><p class="title">34</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories"><p class="title">4</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags"><p class="title">11</p></a></div></div></nav></div></div><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/"><span class="level-start"><span class="level-item">一文了解</span></span><span class="level-end"><span class="level-item tag">13</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/"><span class="level-start"><span class="level-item">技术架构</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BB%BC%E8%BF%B0/"><span class="level-start"><span class="level-item">综述</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E9%97%AE%E9%A2%98/"><span class="level-start"><span class="level-item">问题</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li></ul></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a><p class="is-size-7"><span>&copy; 2022 面向问题编程</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-CN");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/lg-zoom@1.3.0/dist/lg-zoom.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script type="text/x-mathjax-config">MathJax.Hub.Config({
+            'HTML-CSS': {
+                matchFontHeight: false
+            },
+            SVG: {
+                matchFontHeight: false
+            },
+            CommonHTML: {
+                matchFontHeight: false
+            },
+            tex2jax: {
+                inlineMath: [
+                    ['$','$'],
+                    ['\\(','\\)']
+                ]
+            }
+        });</script><script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.9/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script><!--!--><!--!--><!--!--><script src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script src="/js/insight.js" defer></script><script>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script></body></html>
