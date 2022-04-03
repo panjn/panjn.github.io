@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><title>一文了解k8s service的不同类型：ClusterIP、NodePort和LoadBalancer等 - 面向问题编程</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="面向问题编程"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="面向问题编程"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="在 Kubernetes 中 Service 主要有4种不同的类型，其中的 ClusterIP 是最基础的，如下图所示："><meta property="og:type" content="blog"><meta property="og:title" content="一文了解k8s service的不同类型：ClusterIP、NodePort和LoadBalancer等"><meta property="og:url" content="https://www.heapoverflow.cn/pages/wiki-k8s-service-type/"><meta property="og:site_name" content="面向问题编程"><meta property="og:description" content="在 Kubernetes 中 Service 主要有4种不同的类型，其中的 ClusterIP 是最基础的，如下图所示："><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://www.heapoverflow.cn/img/wiki-k8s-service-type/9.jpg"><meta property="article:published_time" content="2022-04-03T11:48:28.965Z"><meta property="article:modified_time" content="2022-04-03T11:56:21.654Z"><meta property="article:author" content="面向问题编程"><meta property="article:tag" content="Kubernetes"><meta property="twitter:card" content="summary"><meta property="twitter:image" content="/img/wiki-k8s-service-type/9.jpg"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.heapoverflow.cn/pages/wiki-k8s-service-type/"},"headline":"一文了解k8s service的不同类型：ClusterIP、NodePort和LoadBalancer等","image":["https://www.heapoverflow.cn/img/wiki-k8s-service-type/9.jpg"],"datePublished":"2022-04-03T11:48:28.965Z","dateModified":"2022-04-03T11:56:21.654Z","author":{"@type":"Person","name":"面向问题编程"},"publisher":{"@type":"Organization","name":"面向问题编程","logo":{"@type":"ImageObject","url":"https://www.heapoverflow.cn/img/logo.svg"}},"description":"在 Kubernetes 中 Service 主要有4种不同的类型，其中的 ClusterIP 是最基础的，如下图所示："}</script><link rel="canonical" href="https://www.heapoverflow.cn/pages/wiki-k8s-service-type/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><script src="https://www.googletagmanager.com/gtag/js?id=G-ETGL163DQH" async></script><script>window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    
+        gtag('config', 'G-ETGL163DQH');</script><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><script data-ad-client="ca-pub-6757924689439593" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+          Array
+              .from(document.querySelectorAll('.tab-content'))
+              .forEach($tab => {
+                  $tab.classList.add('is-hidden');
+              });
+          Array
+              .from(document.querySelectorAll('.tabs li'))
+              .forEach($tab => {
+                  $tab.classList.remove('is-active');
+              });
+          const $activeTab = document.querySelector(location.hash);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+          const $tabMenu = document.querySelector(`a[href="${location.hash}"]`);
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 6.0.0"></head><body class="is-2-column"><nav class="navbar navbar-main"><div class="container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/categories/%E9%97%AE%E9%A2%98/">问题</a><a class="navbar-item" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/">技术架构</a><a class="navbar-item" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></div><div class="navbar-end"><a class="navbar-item" rel="noopener" title="分类" href="/categories">分类</a><a class="navbar-item" rel="noopener" title="标签" href="/tags">标签</a><a class="navbar-item" rel="noopener" title="归档" href="/archives">归档</a><a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;"><i class="fas fa-list-ul"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-9-widescreen"><div class="card"><div class="card-image"><span class="image is-7by3"><img class="fill" src="/img/wiki-k8s-service-type/9.jpg" alt="一文了解k8s service的不同类型：ClusterIP、NodePort和LoadBalancer等"></span></div><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-04-03T11:48:28.965Z" title="2022/4/3 下午7:48:28">2022-04-03</time>发表</span><span class="level-item"><time dateTime="2022-04-03T11:56:21.654Z" title="2022/4/3 下午7:56:21">2022-04-03</time>更新</span><span class="level-item"><a class="link-muted" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></span><span class="level-item">11 分钟读完 (大约1719个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">一文了解k8s service的不同类型：ClusterIP、NodePort和LoadBalancer等</h1><div class="content"><p>在 Kubernetes 中 Service 主要有4种不同的类型，其中的 ClusterIP 是最基础的，如下图所示：</p>
+<span id="more"></span>
+
+<p><img src="/img/wiki-k8s-service-type/1.jpg"></p>
+<p>当我们创建一个 NodePort 的 Service 时，它也会创建一个 ClusterIP，而如果你创建一个 LoadBalancer，它就会创建一个 NodePort，然后创建一个 ClusterIP</p>
+<p>此外我们还需要明白 Service 是指向 pods 的，Service 不是直接指向 Deployments 或 ReplicaSets，而是直接使用 labels 标签指向 Pod，这种方式就提供了极大的灵活性，因为通过什么方式创建的 Pod 其实并不重要。接下来我们通过一个简单的例子开始，我们用不同的 Service 类型来逐步扩展，看看这些 Service 是如何建立的。</p>
+<h2 id="No-Services"><a href="#No-Services" class="headerlink" title="No Services"></a>No Services</h2><p>最开始我们没有任何的 Services。</p>
+<p><img src="/img/wiki-k8s-service-type/2.jpg"></p>
+<p>我们有两个节点，一个 Pod，节点有外网（4.4.4.1、4.4.4.2）和内网（1.1.1.1、1.1.1.2）的 IP 地址，pod-python 这个 Pod 只有一个内部的 IP 地址。</p>
+<p><img src="/img/wiki-k8s-service-type/3.jpg"></p>
+<p>现在我们添加第二个名为 pod-nginx 的 Pod，它被调度在 node-1 节点上。在 Kubernetes 中，所有的 Pod 之间都可以通过 Pod 的 IP 进行通信，不管它们运行在哪个节点上。这意味着 pod-nginx 可以使用其内部IP 1.1.1.3 来 ping 和连接 pod-python 这个 Pod。</p>
+<p><img src="/img/wiki-k8s-service-type/4.jpg"></p>
+<p>现在如果 pod-python 挂掉了重新创建了一个新的 pod-python 出来（本文不涉及如何管理和控制 pods），重新分配了一个新的 1.1.1.5 的 Pod IP 地址，这个时候 pod-nginx 就无法再达到 1.1.1.3 这个之前的地址了，为了防止这种情况发生，我们就需要创建一个 Service 服务了！</p>
+<h2 id="ClusterIP"><a href="#ClusterIP" class="headerlink" title="ClusterIP"></a>ClusterIP</h2><p><img src="/img/wiki-k8s-service-type/5.jpg"></p>
+<p>和上面同样的场景，但是我们创建了一个名为 service-python 类型为 ClusterIP 的 Service 服务，一个 Service 并不像 Pod 那样运行在一个特定的节点上，这里我们可以假设一个 Service 只是在整个集群内部的内存中可用就可以了。</p>
+<p>pod-nginx 可以安全地连接到 1.1.10.1 这个 ClusterIP 或直接通过 dns 名service-python 进行通信，并被重定向到后面一个可用的 Pod 上去。</p>
+<p><img src="/img/wiki-k8s-service-type/6.jpg"></p>
+<p>现在我们来稍微扩展下这个示例，启动3个 python 实例，现在我们来显示所有 Pod 和 Service 内部 IP 地址的端口。</p>
+<p>集群内部的所有 Pods 都可以通过 <code>http://1.1.10.1:3000</code> 或者 <code>http://service-python:3000</code> 来访问到后面的 python pods 的443端口。</p>
+<p><strong>service-python</strong> 这个 Service  是随机或轮询的方式来转发请求的，这个就是 ClusterIP Service 的作用，它通过一个名称和一个 IP 让集群内部的 Pods 可用。</p>
+<p>上图中的 service-python 这个 Service 可以用下面的 yaml 文件来创建：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="string">apiVersion:</span> <span class="string">v1</span>  </span><br><span class="line"><span class="string">kind:</span> <span class="string">Service</span>  </span><br><span class="line"><span class="attr">metadata:</span>  </span><br><span class="line">  <span class="string">name:</span> <span class="string">service-python</span>  </span><br><span class="line"><span class="attr">spec:</span>  </span><br><span class="line">  <span class="attr">ports:</span>  </span><br><span class="line">  <span class="string">-</span> <span class="string">port:</span> <span class="number">3000</span>  </span><br><span class="line">    <span class="string">protocol:</span> <span class="string">TCP</span>  </span><br><span class="line">    <span class="string">targetPort:</span> <span class="number">443</span>  </span><br><span class="line">  <span class="attr">selector:</span>  </span><br><span class="line">    <span class="string">run:</span> <span class="string">pod-python</span>  </span><br><span class="line">  <span class="string">type:</span> <span class="string">ClusterIP</span>  </span><br></pre></td></tr></table></figure>
+
+<p>创建后，可以用 <code>kubectl get svc</code> 命令来查看：</p>
+<p><img src="/img/wiki-k8s-service-type/7.jpg"></p>
+<h2 id="NodePort"><a href="#NodePort" class="headerlink" title="NodePort"></a>NodePort</h2><p>现在我们想让 ClusterIP Service 可以从集群外部进行访问，为此我们需要把它转换成 NodePort 类型的 Service，在我们的例子中，我们只需要简单修改上面的 <strong>service-python</strong> 这个 Service 服务即可：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="string">apiVersion:</span> <span class="string">v1</span>  </span><br><span class="line"><span class="string">kind:</span> <span class="string">Service</span>  </span><br><span class="line"><span class="attr">metadata:</span>  </span><br><span class="line">  <span class="string">name:</span> <span class="string">service-python</span>  </span><br><span class="line"><span class="attr">spec:</span>  </span><br><span class="line">  <span class="attr">ports:</span>  </span><br><span class="line">  <span class="string">-</span> <span class="string">port:</span> <span class="number">3000</span>  </span><br><span class="line">    <span class="string">protocol:</span> <span class="string">TCP</span>  </span><br><span class="line">    <span class="string">targetPort:</span> <span class="number">443</span>  </span><br><span class="line">    <span class="string">nodePort:</span> <span class="number">30080</span>  </span><br><span class="line">  <span class="attr">selector:</span>  </span><br><span class="line">    <span class="string">run:</span> <span class="string">pod-python</span>  </span><br><span class="line">  <span class="string">type:</span> <span class="string">NodePort</span>  </span><br></pre></td></tr></table></figure>
+
+<p>更新完成后，如下图所示：</p>
+<p><img src="/img/wiki-k8s-service-type/8.jpg"></p>
+<p>这意味着我们的内部的 <strong>service-python</strong> 这个 Service 现在也可以通过30080 端口从<strong>每个节点</strong>的内部和外部 IP 地址进行访问了。</p>
+<p><img src="/img/wiki-k8s-service-type/9.jpg"></p>
+<p>集群内部的 Pod 也可以通过内网节点 IP 连接到 30080 端口。</p>
+<p><img src="/img/wiki-k8s-service-type/10.jpg"></p>
+<p>运行 <code>kubectl get svc</code> 命令来查看这个 NodePort 的 Service，可以看到同样有一个 ClusterIP，只是类型和额外的节点端口不同。在内部，NodePort 服务仍然像之前的 ClusterIP 服务一样。  </p>
+<p><img src="/img/wiki-k8s-service-type/11.jpg"></p>
+<h2 id="LoadBalancer"><a href="#LoadBalancer" class="headerlink" title="LoadBalancer"></a>LoadBalancer</h2><p>如果我们希望有一个单独的 IP 地址，将请求分配给所有的外部节点IP（比如使用 round robin），我们就可以使用 LoadBalancer 服务，所以它是建立在 NodePort 服务之上的。</p>
+<p><img src="/img/wiki-k8s-service-type/12.jpg"></p>
+<p>一个 LoadBalancer 服务创建了一个 NodePort 服务，NodePort 服务创建了一个 ClusterIP 服务。我们也只需要将服务类型更改为 LoadBalancer 即可。</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="string">apiVersion:</span> <span class="string">v1</span>  </span><br><span class="line"><span class="string">kind:</span> <span class="string">Service</span>  </span><br><span class="line"><span class="attr">metadata:</span>  </span><br><span class="line">  <span class="string">name:</span> <span class="string">service-python</span>  </span><br><span class="line"><span class="attr">spec:</span>  </span><br><span class="line">  <span class="attr">ports:</span>  </span><br><span class="line">  <span class="string">-</span> <span class="string">port:</span> <span class="number">3000</span>  </span><br><span class="line">    <span class="string">protocol:</span> <span class="string">TCP</span>  </span><br><span class="line">    <span class="string">targetPort:</span> <span class="number">443</span>  </span><br><span class="line">    <span class="string">nodePort:</span> <span class="number">30080</span>  </span><br><span class="line">  <span class="attr">selector:</span>  </span><br><span class="line">    <span class="string">run:</span> <span class="string">pod-python</span>  </span><br><span class="line">  <span class="string">type:</span> <span class="string">LoadBalancer</span>  </span><br></pre></td></tr></table></figure>
+
+<p>LoadBalancer 服务所做的就是创建一个 NodePort 服务，此外，它还会向托管 Kubernetes 集群的提供商发送一条消息，要求设置一个指向所有外部节点 IP 和特定 nodePort 端口的负载均衡器，当然前提条件是要提供商支持。</p>
+<p>现在运行 <code>kubectl get svc</code> 可以看到新增了 external-IP 和 LoadBalancer 的类型。</p>
+<p><img src="/img/wiki-k8s-service-type/13.jpg"></p>
+<p>LoadBalancer 服务仍然像和以前一样在节点内部和外部 IP 上打开 30080 端口。</p>
+<h2 id="ExternalName"><a href="#ExternalName" class="headerlink" title="ExternalName"></a>ExternalName</h2><p>最后是 ExternalName 服务，这个服务和前面的几种类型的服务有点分离。它创建一个内部服务，其端点指向一个 DNS 名。</p>
+<p>我们假设 pod-nginx 运行在 Kubernetes 集群中，但是 python api 服务在集群外部。</p>
+<p><img src="/img/wiki-k8s-service-type/14.jpg"></p>
+<p>这里 <strong>pod-nginx</strong> 这个 Pod 可以直接通过 <a target="_blank" rel="noopener" href="http://remote.server.url.com/">http://remote.server.url.com</a> 连接到外部的 python api 服务上去，但是如果我们考虑到以后某个时间节点希望把这个 python api 服务集成到 Kubernetes 集群中去，还不希望去更改连接的地址，这个时候我们就可以创建一个 ExternalName 类型的 Service 服务了。</p>
+<p><img src="/img/wiki-k8s-service-type/15.jpg"></p>
+<p>对应的 YAML 资源清单文件如下所示：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="string">kind:</span> <span class="string">Service</span>  </span><br><span class="line"><span class="string">apiVersion:</span> <span class="string">v1</span>  </span><br><span class="line"><span class="attr">metadata:</span>  </span><br><span class="line">  <span class="string">name:</span> <span class="string">service-python</span>  </span><br><span class="line"><span class="attr">spec:</span>  </span><br><span class="line">  <span class="attr">ports:</span>  </span><br><span class="line">  <span class="string">-</span> <span class="string">port:</span> <span class="number">3000</span>  </span><br><span class="line">    <span class="string">protocol:</span> <span class="string">TCP</span>  </span><br><span class="line">    <span class="string">targetPort:</span> <span class="number">443</span>  </span><br><span class="line">  <span class="string">type:</span> <span class="string">ExternalName</span>  </span><br><span class="line">  <span class="string">externalName:</span> <span class="string">remote.server.url.com</span>  </span><br></pre></td></tr></table></figure>
+
+<p>现在 <strong>pod-nginx</strong> 就可以很方便地通过 <code>http://service-python:3000</code> 进行通信了，就像使用 ClusterIP 服务一样，当我们决定将 python api 这个服务也迁移到我们 Kubernetes 集群中时，我们只需要将服务改为 ClusterIP 服务，并设置正确的标签即可，其他都不需要更改了。</p>
+<p><img src="/img/wiki-k8s-service-type/16.jpg"></p>
+<p>到这里我们就用几张图将 Kubernetes 中的 Service 解释得明明白白清清楚楚真真切切了~~~  </p>
+<blockquote>
+<p>原文链接：<a target="_blank" rel="noopener" href="https://medium.com/swlh/kubernetes-services-simply-visually-explained-2d84e58d70e5">https://medium.com/swlh/kubernetes-services-simply-visually-explained-2d84e58d70e5</a></p>
+</blockquote>
+<article class="message message-immersive is-primary">
+<div class="message-body">
+<i class="fas fa-globe-asia mr-2"></i>本文来自
+<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/2qYgORto5voMliFSzqNrPw">k8s技术圈</a>.
+</div>
+</article>
+</div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/Kubernetes/">Kubernetes</a></div><!--!--><div><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6757924689439593" crossOrigin="anonymous"></script><ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-6757924689439593" data-ad-slot="2352785969"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div></article></div><!--!--><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/pages/wiki-k8s-ingress/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">一文了解k8s Ingress</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/pages/wiki-k8s-kubedns/"><span class="level-item">一文了解k8s服务发现之KubeDNS</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--><div style="width:100%"><script src="https://giscus.app/client.js" data-repo="thetechstack/thetechstack.github.io" data-repo-id="R_kgDOG6Ti1Q" data-category="Announcements" data-category-id="DIC_kwDOG6Ti1c4COQtm" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light" data-lang="zh-CN" crossOrigin="anonymous" async></script></div></div><!--!--><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen  order-3 is-sticky"><div class="card widget" id="toc" data-type="toc"><div class="card-content"><div class="menu"><h3 class="menu-label">目录</h3><ul class="menu-list"><li><a class="level is-mobile" href="#No-Services"><span class="level-left"><span class="level-item">1</span><span class="level-item">No Services</span></span></a></li><li><a class="level is-mobile" href="#ClusterIP"><span class="level-left"><span class="level-item">2</span><span class="level-item">ClusterIP</span></span></a></li><li><a class="level is-mobile" href="#NodePort"><span class="level-left"><span class="level-item">3</span><span class="level-item">NodePort</span></span></a></li><li><a class="level is-mobile" href="#LoadBalancer"><span class="level-left"><span class="level-item">4</span><span class="level-item">LoadBalancer</span></span></a></li><li><a class="level is-mobile" href="#ExternalName"><span class="level-left"><span class="level-item">5</span><span class="level-item">ExternalName</span></span></a></li></ul></div></div><style>#toc .menu-list > li > a.is-active + .menu-list { display: block; }#toc .menu-list > li > a + .menu-list { display: none; }</style><script src="/js/toc.js" defer></script></div><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg"></figure><p class="is-size-6 is-block">公众号：面向问题编程</p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives"><p class="title">41</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories"><p class="title">4</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags"><p class="title">11</p></a></div></div></nav></div></div><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/"><span class="level-start"><span class="level-item">一文了解</span></span><span class="level-end"><span class="level-item tag">20</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/"><span class="level-start"><span class="level-item">技术架构</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BB%BC%E8%BF%B0/"><span class="level-start"><span class="level-item">综述</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E9%97%AE%E9%A2%98/"><span class="level-start"><span class="level-item">问题</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li></ul></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a><p class="is-size-7"><span>&copy; 2022 面向问题编程</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-CN");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/lg-zoom@1.3.0/dist/lg-zoom.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script type="text/x-mathjax-config">MathJax.Hub.Config({
+            'HTML-CSS': {
+                matchFontHeight: false
+            },
+            SVG: {
+                matchFontHeight: false
+            },
+            CommonHTML: {
+                matchFontHeight: false
+            },
+            tex2jax: {
+                inlineMath: [
+                    ['$','$'],
+                    ['\\(','\\)']
+                ]
+            }
+        });</script><script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.9/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script><!--!--><!--!--><!--!--><script src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script src="/js/insight.js" defer></script><script>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script></body></html>

@@ -2,6 +2,33 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <url>
+    <loc>https://www.heapoverflow.cn/pages/wiki-k8s-ingress/</loc>
+    
+    <lastmod>2022-04-03</lastmod>
+    
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <url>
+    <loc>https://www.heapoverflow.cn/pages/wiki-k8s-service-type/</loc>
+    
+    <lastmod>2022-04-03</lastmod>
+    
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <url>
+    <loc>https://www.heapoverflow.cn/pages/single-node-k8s-ubuntu/</loc>
+    
+    <lastmod>2022-04-03</lastmod>
+    
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <url>
     <loc>https://www.heapoverflow.cn/pages/wiki-k8s-kubedns/</loc>
     
     <lastmod>2022-04-03</lastmod>
@@ -12,15 +39,6 @@
   
   <url>
     <loc>https://www.heapoverflow.cn/pages/wiki-k8s-service/</loc>
-    
-    <lastmod>2022-04-03</lastmod>
-    
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  
-  <url>
-    <loc>https://www.heapoverflow.cn/pages/single-node-k8s-ubuntu/</loc>
     
     <lastmod>2022-04-03</lastmod>
     
@@ -450,14 +468,14 @@
 
   
   <url>
-    <loc>https://www.heapoverflow.cn/categories/%E7%BB%BC%E8%BF%B0/</loc>
+    <loc>https://www.heapoverflow.cn/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/</loc>
     <lastmod>2022-04-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.2</priority>
   </url>
   
   <url>
-    <loc>https://www.heapoverflow.cn/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/</loc>
+    <loc>https://www.heapoverflow.cn/categories/%E7%BB%BC%E8%BF%B0/</loc>
     <lastmod>2022-04-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.2</priority>
