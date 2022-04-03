@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><title>一文了解netfilter 和 iptables - 面向问题编程</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="面向问题编程"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="面向问题编程"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="Netfilter （配合 iptables）使得用户空间应用程序可以注册内核网络栈在处理数据包时应用的处理规则，实现高效的网络转发和过滤。很多常见的主机防火墙程序以及 Kubernetes 的 Service 转发都是通过 iptables 来实现的。 关于 netfilter 的介绍文章大部分只描述了抽象的概念，实际上其内核代码的基本实现不算复杂，本文主要参考 Linux 内核 2.6 版本代"><meta property="og:type" content="blog"><meta property="og:title" content="一文了解netfilter 和 iptables"><meta property="og:url" content="https://www.heapoverflow.cn/pages/wiki-netfilter-iptables/"><meta property="og:site_name" content="面向问题编程"><meta property="og:description" content="Netfilter （配合 iptables）使得用户空间应用程序可以注册内核网络栈在处理数据包时应用的处理规则，实现高效的网络转发和过滤。很多常见的主机防火墙程序以及 Kubernetes 的 Service 转发都是通过 iptables 来实现的。 关于 netfilter 的介绍文章大部分只描述了抽象的概念，实际上其内核代码的基本实现不算复杂，本文主要参考 Linux 内核 2.6 版本代"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://www.heapoverflow.cn/img/wiki-netfilter-iptables/3.jpg"><meta property="article:published_time" content="2022-04-03T01:33:58.330Z"><meta property="article:modified_time" content="2022-04-03T01:48:28.567Z"><meta property="article:author" content="面向问题编程"><meta property="article:tag" content="Linux网络"><meta property="twitter:card" content="summary"><meta property="twitter:image" content="/img/wiki-netfilter-iptables/3.jpg"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.heapoverflow.cn/pages/wiki-netfilter-iptables/"},"headline":"一文了解netfilter 和 iptables","image":["https://www.heapoverflow.cn/img/wiki-netfilter-iptables/3.jpg"],"datePublished":"2022-04-03T01:33:58.330Z","dateModified":"2022-04-03T01:48:28.567Z","author":{"@type":"Person","name":"面向问题编程"},"publisher":{"@type":"Organization","name":"面向问题编程","logo":{"@type":"ImageObject","url":"https://www.heapoverflow.cn/img/logo.svg"}},"description":"Netfilter （配合 iptables）使得用户空间应用程序可以注册内核网络栈在处理数据包时应用的处理规则，实现高效的网络转发和过滤。很多常见的主机防火墙程序以及 Kubernetes 的 Service 转发都是通过 iptables 来实现的。 关于 netfilter 的介绍文章大部分只描述了抽象的概念，实际上其内核代码的基本实现不算复杂，本文主要参考 Linux 内核 2.6 版本代"}</script><link rel="canonical" href="https://www.heapoverflow.cn/pages/wiki-netfilter-iptables/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><script src="https://www.googletagmanager.com/gtag/js?id=G-ETGL163DQH" async></script><script>window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    
+        gtag('config', 'G-ETGL163DQH');</script><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><script data-ad-client="ca-pub-6757924689439593" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+          Array
+              .from(document.querySelectorAll('.tab-content'))
+              .forEach($tab => {
+                  $tab.classList.add('is-hidden');
+              });
+          Array
+              .from(document.querySelectorAll('.tabs li'))
+              .forEach($tab => {
+                  $tab.classList.remove('is-active');
+              });
+          const $activeTab = document.querySelector(location.hash);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+          const $tabMenu = document.querySelector(`a[href="${location.hash}"]`);
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 6.0.0"></head><body class="is-2-column"><nav class="navbar navbar-main"><div class="container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/categories/%E9%97%AE%E9%A2%98/">问题</a><a class="navbar-item" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/">技术架构</a><a class="navbar-item" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></div><div class="navbar-end"><a class="navbar-item" rel="noopener" title="分类" href="/categories">分类</a><a class="navbar-item" rel="noopener" title="标签" href="/tags">标签</a><a class="navbar-item" rel="noopener" title="归档" href="/archives">归档</a><a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;"><i class="fas fa-list-ul"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-9-widescreen"><div class="card"><div class="card-image"><span class="image is-7by3"><img class="fill" src="/img/wiki-netfilter-iptables/3.jpg" alt="一文了解netfilter 和 iptables"></span></div><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-04-03T01:33:58.330Z" title="2022/4/3 上午9:33:58">2022-04-03</time>发表</span><span class="level-item"><time dateTime="2022-04-03T01:48:28.567Z" title="2022/4/3 上午9:48:28">2022-04-03</time>更新</span><span class="level-item"><a class="link-muted" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></span><span class="level-item">34 分钟读完 (大约5123个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">一文了解netfilter 和 iptables</h1><div class="content"><p>Netfilter （配合 iptables）使得用户空间应用程序可以注册内核网络栈在处理数据包时应用的处理规则，实现高效的网络转发和过滤。很多常见的主机防火墙程序以及 Kubernetes 的 Service 转发都是通过 iptables 来实现的。</p>
+<p>关于 netfilter 的介绍文章大部分只描述了抽象的概念，实际上其内核代码的基本实现不算复杂，本文主要参考 Linux 内核 2.6 版本代码（早期版本较为简单），与最新的 5.x 版本在实现上可能有较大差异，但基本设计变化不大，不影响理解其原理。</p>
+<span id="more"></span>
+
+<p>本文假设读者已对 TCP&#x2F;IP 协议有基本了解。</p>
+<h2 id="Netfilter-的设计与实现"><a href="#Netfilter-的设计与实现" class="headerlink" title="Netfilter 的设计与实现"></a>Netfilter 的设计与实现</h2><p>netfilter 的定义是一个工作在 Linux 内核的网络数据包处理框架，为了彻底理解 netfilter 的工作方式，我们首先需要对数据包在 Linux 内核中的处理路径建立基本认识。</p>
+<h3 id="数据包的内核之旅"><a href="#数据包的内核之旅" class="headerlink" title="数据包的内核之旅"></a>数据包的内核之旅</h3><p>数据包在内核中的处理路径，也就是处理网络数据包的内核代码调用链，大体上也可按 TCP&#x2F;IP 模型分为多个层级，以接收一个 IPv4 的 tcp 数据包为例：</p>
+<ol>
+<li>在物理-网络设备层，网卡通过 DMA 将接收到的数据包写入内存中的 <code>ring buffer</code>，经过一系列中断和调度后，操作系统内核调用 <code>__skb_dequeue</code> 将数据包加入对应设备的处理队列中，并转换成 <code>sk_buffer</code> 类型（即 socket buffer - 将在整个内核调用栈中持续作为参数传递的基础数据结构，下文指称的数据包都可以认为是 <code>sk_buffer</code>），最后调用 <code>netif_receive_skb</code> 函数按协议类型对数据包进行分类，并跳转到对应的处理函数。如下图所示：</li>
+</ol>
+<p><img src="/img/wiki-netfilter-iptables/2.jpg" alt="network-path"></p>
+<p>network-path</p>
+<ol start="2">
+<li>假设该数据包为 IP 协议包，对应的接收包处理函数 <code>ip_rcv</code> 将被调用，数据包处理进入网络（IP）层。<code>ip_rcv</code> 检查数据包的 IP 首部并丢弃出错的包，必要时还会聚合被分片的 IP 包。然后执行 <code>ip_rcv_finish</code> 函数，对数据包进行路由查询并决定是将数据包交付本机还是转发其他主机。假设数据包的目的地址是本主机，接着执行的 <code>dst_input</code> 函数将调用 <code>ip_local_deliver</code> 函数。<code>ip_local_deliver</code> 函数中将根据 IP 首部中的协议号判断载荷数据的协议类型，最后调用对应类型的包处理函数。本例中将调用 TCP 协议对应的 <code>tcp_v4_rcv</code> 函数，之后数据包处理进入传输层。</li>
+<li><code>tcp_v4_rcv</code> 函数同样读取数据包的 TCP 首部并计算校验和，然后在数据包对应的 TCP control buffer 中维护一些必要状态包括 TCP 序列号以及 SACK 号等。该函数下一步将调用 <code>__tcp_v4_lookup</code> 查询数据包对应的 socket，如果没找到或 socket 的连接状态处于 <strong>TCP_TIME_WAIT</strong>，数据包将被丢弃。如果 socket 处于未加锁状态，数据包将通过调用 <code>tcp_prequeue</code> 函数进入 <code>prequeue</code> 队列，之后数据包将可被用户态的用户程序所处理。传输层的处理流程超出本文讨论范围，实际上还要复杂很多。</li>
+</ol>
+<h3 id="netfilter-hooks"><a href="#netfilter-hooks" class="headerlink" title="netfilter hooks"></a>netfilter hooks</h3><p>接下来我们正式进入主题。netfilter 的首要组成部分是 netfilter hooks。</p>
+<h4 id="hook-触发点"><a href="#hook-触发点" class="headerlink" title="hook 触发点"></a>hook 触发点</h4><p>对于不同的协议（IPv4、IPv6 或 ARP 等），Linux 内核网络栈会在该协议栈数据包处理路径上的预设位置触发对应的 hook。在不同协议处理流程中的触发点位置以及对应的 hook 名称（蓝色矩形外部的黑体字）如下，本文仅重点关注 IPv4 协议：</p>
+<p><img src="/img/wiki-netfilter-iptables/3.jpg" alt="netfilter-flow"></p>
+<p>netfilter-flow</p>
+<p>所谓的 hook 实质上是代码中的枚举对象（值为从 0 开始递增的整型）：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">```c</span><br><span class="line"><span class="class"><span class="keyword">enum</span> <span class="title">nf_inet_hooks</span> &#123;</span></span><br><span class="line">	NF_INET_PRE_ROUTING,</span><br><span class="line">	NF_INET_LOCAL_IN,</span><br><span class="line">	NF_INET_FORWARD,</span><br><span class="line">	NF_INET_LOCAL_OUT,</span><br><span class="line">	NF_INET_POST_ROUTING,</span><br><span class="line">	NF_INET_NUMHOOKS</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>每个 hook 在内核网络栈中对应特定的触发点位置，以 IPv4 协议栈为例，有以下 netfilter hooks 定义：</p>
+<p><img src="/img/wiki-netfilter-iptables/4.jpg" alt="netfilter-hooks-stack"></p>
+<p>netfilter-hooks-stack</p>
+<ul>
+<li>NF_INET_PRE_ROUTING: 这个 hook 在 IPv4 协议栈的 <code>ip_rcv</code> 函数或 IPv6 协议栈的 <code>ipv6_rcv</code> 函数中执行。所有接收数据包到达的第一个 hook 触发点（实际上新版本 Linux 增加了 INGRESS hook 作为最早触发点），在进行路由判断之前执行。</li>
+<li>NF_INET_LOCAL_IN: 这个 hook 在 IPv4 协议栈的 <code>ip_local_deliver()</code> 函数或 IPv6 协议栈的 <code>ip6_input()</code> 函数中执行。经过路由判断后，所有目标地址是本机的接收数据包到达此 hook 触发点。</li>
+<li>NF_INET_FORWARD: 这个 hook 在 IPv4 协议栈的 <code>ip_forward()</code> 函数或 IPv6 协议栈的 <code>ip6_forward()</code> 函数中执行。经过路由判断后，所有目标地址不是本机的接收数据包到达此 hook 触发点。</li>
+<li>NF_INET_LOCAL_OUT: 这个 hook 在 IPv4 协议栈的 <code>__ip_local_out()</code> 函数或 IPv6 协议栈的 <code>__ip6_local_out()</code> 函数中执行。所有本机产生的准备发出的数据包，在进入网络栈后首先到达此 hook 触发点。</li>
+<li>NF_INET_POST_ROUTING: 这个 hook 在 IPv4 协议栈的 <code>ip_output()</code> 函数或 IPv6 协议栈的 <code>ip6_finish_output2()</code> 函数中执行。本机产生的准备发出的数据包或者转发的数据包，在经过路由判断之后， 将到达此 hook 触发点。</li>
+</ul>
+<h4 id="NF-HOOK-宏和-netfilter-向量"><a href="#NF-HOOK-宏和-netfilter-向量" class="headerlink" title="NF_HOOK 宏和 netfilter 向量"></a>NF_HOOK 宏和 netfilter 向量</h4><p>所有的触发点位置统一调用 <code>NF_HOOK</code> 这个宏来触发 hook：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="keyword">inline</span> <span class="type">int</span> <span class="title function_">NF_HOOK</span><span class="params">(<span class="type">uint8_t</span> pf, <span class="type">unsigned</span> <span class="type">int</span> hook, <span class="keyword">struct</span> sk_buff *skb,</span></span><br><span class="line"><span class="params">	<span class="keyword">struct</span> net_device *in, <span class="keyword">struct</span> net_device *out,</span></span><br><span class="line"><span class="params">	<span class="type">int</span> (*okfn)(<span class="keyword">struct</span> sk_buff *))</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="keyword">return</span> NF_HOOK_THRESH(pf, hook, skb, in, out, okfn, INT_MIN);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>NF-HOOK</code> 接收的参数如下：</p>
+<ul>
+<li>pf: 数据包的协议族，对 IPv4 来说是 <code>NFPROTO_IPV4</code>。</li>
+<li>hook: 上图中所示的 netfilter hook 枚举对象，如 NF_INET_PRE_ROUTING 或 NF_INET_LOCAL_OUT。</li>
+<li>skb: SKB 对象，表示正在被处理的数据包。</li>
+<li>in: 数据包的输入网络设备。</li>
+<li>out: 数据包的输出网络设备。</li>
+<li>okfn: 一个指向函数的指针，该函数将在该 hook 即将终止时调用，通常传入数据包处理路径上的下一个处理函数。</li>
+</ul>
+<p><code>NF-HOOK</code> 的返回值是以下具有特定含义的 netfilter 向量之一：</p>
+<ol>
+<li>NF_ACCEPT: 在处理路径上正常继续（实际上是在 <code>NF-HOOK</code> 中最后执行传入的 <code>okfn</code>）。</li>
+<li>NF_DROP: 丢弃数据包，终止处理。</li>
+<li>NF_STOLEN: 数据包已转交，终止处理。</li>
+<li>NF_QUEUE: 将数据包入队后供其他处理。</li>
+<li>NF_REPEAT: 重新调用当前 hook。</li>
+</ol>
+<p>回归到源码，IPv4 内核网络栈会在以下代码模块中调用 <code>NF_HOOK()</code>：</p>
+<p><img src="/img/wiki-netfilter-iptables/5.jpg" alt="NF_HOOK"></p>
+<p>NF_HOOK实际调用方式以 <strong>`net&#x2F;ipv4&#x2F;ip_forward.c`[1]</strong> 对数据包进行转发的源码为例，在 <code>ip_forward</code> 函数结尾部分的第 115 行以 <strong>NF_INET_FORWARD</strong> hook 作为入参调用了 <strong><code>NF_HOOK</code></strong> 宏，并将网络栈接下来的处理函数 <code>ip_forward_finish</code> 作为 <code>okfn</code> 参数传入<strong>：</strong></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">ip_forward</span><span class="params">(<span class="keyword">struct</span> sk_buff *skb)</span></span><br><span class="line">&#123;</span><br><span class="line">.....(省略部分代码)</span><br><span class="line"><span class="keyword">if</span> (rt-&gt;rt_flags&amp;RTCF_DOREDIRECT &amp;&amp; !opt-&gt;srr &amp;&amp; !skb_sec_path(skb))</span><br><span class="line">		ip_rt_send_redirect(skb);</span><br><span class="line"></span><br><span class="line">	skb-&gt;priority = rt_tos2priority(iph-&gt;tos);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> NF_HOOK(NFPROTO_IPV4, NF_INET_FORWARD, skb, skb-&gt;dev,</span><br><span class="line">		       rt-&gt;dst.dev, ip_forward_finish);</span><br><span class="line">.....(省略部分代码)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="回调函数与优先级"><a href="#回调函数与优先级" class="headerlink" title="回调函数与优先级"></a>回调函数与优先级</h3><p>netfilter 的另一组成部分是 hook 的回调函数。内核网络栈既使用 hook 来代表特定触发位置，也使用 hook （的整数值）作为数据索引来访问触发点对应的回调函数。</p>
+<p>内核的其他模块可以通过 netfilter 提供的 api 向指定的 hook 注册回调函数，同一 hook 可以注册多个回调函数，通过注册时指定的 <strong>priority</strong> 参数可指定回调函数在执行时的优先级。</p>
+<p>注册 hook 的回调函数时，首先需要定义一个 <code>nf_hook_ops</code> 结构（或由多个该结构组成的数组），其定义如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">nf_hook_ops</span> &#123;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">list</span>;</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">/* User fills in from here down. */</span></span><br><span class="line">	nf_hookfn *hook;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">module</span> *<span class="title">owner</span>;</span></span><br><span class="line">	<span class="type">u_int8_t</span> pf;</span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> hooknum;</span><br><span class="line">	<span class="comment">/* Hooks are ordered in ascending priority. */</span></span><br><span class="line">  <span class="type">int</span> priority;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>在定义中有 3 个重要成员：</p>
+<ul>
+<li>hook: 将要注册的回调函数，函数参数定义与 <code>NF_HOOK</code> 类似，可通过 <code>okfn</code> 参数嵌套其他函数。</li>
+<li>hooknum: 注册的目标 hook 枚举值。</li>
+<li>priority: 回调函数的优先级，<strong>较小的值优先执行</strong>。</li>
+</ul>
+<p>定义结构体后可通过 <code>int nf_register_hook(struct nf_hook_ops *reg)</code> 或 <code>int nf_register_hooks(struct nf_hook_ops *reg, unsigned int n);</code> 分别注册一个或多个回调函数。同一 netfilter hook 下所有的 <code>nf_hook_ops</code> 注册后以 priority 为顺序组成一个链表结构，注册过程会根据 priority 从链表中找到合适的位置，然后执行链表插入操作。</p>
+<p>在执行 <code>NF-HOOK</code> 宏触发指定的 hook 时，将调用 <code>nf_iterate</code> 函数迭代这个 hook 对应的 <code>nf_hook_ops</code> 链表，并依次调用每一个 <code>nf_hook_ops</code> 的注册函数成员 <code>hookfn</code>。示意图如下：</p>
+<p><img src="/img/wiki-netfilter-iptables/6.jpg" alt="netfilter-hookfn1"></p>
+<p>这种链式调用回调函数的工作方式，也让 netfilter hook 被称为 Chain，下文的 iptables 介绍中尤其体现了这一关联。</p>
+<p>每个回调函数也必须返回一个 netfilter 向量；如果该向量为 <strong>NF_ACCEPT，</strong><code>nf_iterate</code> 将会继续调用下一个 <code>nf_hook_ops</code> 的回调函数，直到所有回调函数调用完毕后返回 <strong>NF_ACCEPT</strong>；如果该向量为 <strong>NF_DROP</strong>，将中断遍历并直接返回 <strong>NF_DROP；**如果该向量为 **NF_REPEAT**，将重新执行该回调函数**。</strong> <code>nf_iterate</code> 的返回值也将作为 <code>NF-HOOK</code> 的返回值，网络栈将根据该向量值判断是否继续执行处理函数。示意图如下：</p>
+<p><img src="/img/wiki-netfilter-iptables/7.jpg" alt="netfilter-hookfn2"></p>
+<p>netfilter hook 的回调函数机制具有以下特性：</p>
+<ul>
+<li>回调函数按优先级依次执行，只有上一回调函数返回 <strong>NF_ACCEPT</strong> 才会继续执行下一回调函数。</li>
+<li>任一回调函数都可以中断该 hook 的回调函数执行链，同时要求整个网络栈中止对数据包的处理。</li>
+</ul>
+<h2 id="iptables"><a href="#iptables" class="headerlink" title="iptables"></a>iptables</h2><p>基于内核 netfilter 提供的 hook 回调函数机制，netfilter 作者 Rusty Russell 还开发了 iptables，实现在用户空间管理应用于数据包的自定义规则。</p>
+<p>iptbles 分为两部分：</p>
+<ul>
+<li>用户空间的 iptables 命令向用户提供访问内核 iptables 模块的管理界面。</li>
+<li>内核空间的 iptables 模块在内存中维护规则表，实现表的创建及注册。</li>
+</ul>
+<h3 id="内核空间模块"><a href="#内核空间模块" class="headerlink" title="内核空间模块"></a>内核空间模块</h3><h4 id="xt-table-的初始化"><a href="#xt-table-的初始化" class="headerlink" title="xt_table 的初始化"></a>xt_table 的初始化</h4><p>在内核网络栈中，iptables 通过 <code>xt_table</code> 结构对众多的数据包处理规则进行有序管理，一个 <code>xt_table</code> 对应一个规则表，对应的用户空间概念为 table。不同的规则表有以下特征：</p>
+<ul>
+<li>对不同的 netfilter hooks 生效。</li>
+<li>在同一 hook 中检查不同规则表的优先级不同。</li>
+</ul>
+<p>基于规则的最终目的，iptables 默认初始化了 4 个不同的规则表，分别是 raw、 filter、nat 和 mangle。下文以 filter 为例介绍 <code>xt_table</code>的初始化和调用过程。</p>
+<p>filter table 的定义如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">define</span> FILTER_VALID_HOOKS ((1 &lt;&lt; NF_INET_LOCAL_IN) |  (1 &lt;&lt; NF_INET_FORWARD) | (1 &lt;&lt; NF_INET_LOCAL_OUT))</span></span><br><span class="line"></span><br><span class="line"><span class="type">static</span> <span class="type">const</span> <span class="class"><span class="keyword">struct</span> <span class="title">xt_table</span> <span class="title">packet_filter</span> =</span> &#123; </span><br><span class="line">		.name = <span class="string">&quot;filter&quot;</span>, </span><br><span class="line">		.valid_hooks = FILTER_VALID_HOOKS, </span><br><span class="line">		.me = THIS_MODULE, </span><br><span class="line">		.af = NFPROTO_IPV4, </span><br><span class="line">		.priority = NF_IP_PRI_FILTER, </span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">(net/ipv4/netfilter/iptable_filter.c)</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>在 <strong>iptable_filter.c[2]</strong> 模块的初始化函数 <a target="_blank" rel="noopener" href="https://elixir.bootlin.com/linux/v2.6.39.4/C/ident/iptable_filter_init">iptable_filter_init</a>，调用<code>xt_hook_link</code> 对 <code>xt_table</code> 结构 packet_filter 执行如下初始化过程：</p>
+<ol>
+<li>通过 <code>.valid_hooks</code> 属性迭代 <code>xt_table</code> 将生效的每一个 hook，对于 filter 来说是 <strong>NF_INET_LOCAL_IN</strong>，<strong>NF_INET_FORWARD</strong> 和 <strong>NF_INET_LOCAL_OUT</strong> 这 3 个 hook。</li>
+<li>对每一个 hook，使用 <code>xt_table</code> 的 priority 属性向 hook 注册一个回调函数。</li>
+</ol>
+<p>不同 table 的 priority 值如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">enum</span> <span class="title">nf_ip_hook_priorities</span> &#123;</span></span><br><span class="line">	NF_IP_PRI_RAW = <span class="number">-300</span>,</span><br><span class="line">	NF_IP_PRI_MANGLE = <span class="number">-150</span>,</span><br><span class="line">	NF_IP_PRI_NAT_DST = <span class="number">-100</span>,</span><br><span class="line">	NF_IP_PRI_FILTER = <span class="number">0</span>,</span><br><span class="line">	NF_IP_PRI_SECURITY = <span class="number">50</span>,</span><br><span class="line">	NF_IP_PRI_NAT_SRC = <span class="number">100</span>,</span><br><span class="line">&#125;;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>当数据包到达某一 hook 触发点时，会依次执行不同 table 在该 hook 上注册的所有回调函数，这些回调函数总是根据上文的 priority 值以固定的相对顺序执行：</p>
+<p><img src="/img/wiki-netfilter-iptables/8.jpg" alt="tables-priority"></p>
+<p>tables-priority</p>
+<h4 id="ipt-do-table"><a href="#ipt-do-table" class="headerlink" title="ipt_do_table()"></a>ipt_do_table()</h4><p>filter 注册的 hook 回调函数 iptable_filter_hook[3] 将对 <code>xt_table</code> 结构执行公共的规则检查函数 ipt_do_table[4]。<code>ipt_do_table</code> 接收 <code>skb</code>、<code>hook</code> 和 <code>xt_table</code>作为参数，对 <code>skb</code> 执行后两个参数所确定的规则集，返回 netfilter 向量作为回调函数的返回值。</p>
+<p>在深入规则执行过程前，需要先了解规则集如何在内存中表示。每一条规则由 3 部分组成：</p>
+<ol>
+<li>一个 <code>ipt_entry</code> 结构体。通过 <code>.next_offset</code> 指向下一个 <code>ipt_entry</code> 的内存偏移地址。</li>
+<li>0 个或多个 <code>ipt_entry_match</code> 结构体，每个结构体可以动态的添加额外数据。</li>
+<li>1 个 <code>ipt_entry_target</code> 结构体， 结构体可以动态的添加额外数据。</li>
+</ol>
+<p><code>ipt_entry</code> 结构体定义如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">ipt_entry</span> &#123;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">ipt_ip</span> <span class="title">ip</span>;</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> nfcache;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/* ipt_entry + matches 在内存中的大小*/</span></span><br><span class="line">	<span class="type">u_int16_t</span> target_offset;</span><br><span class="line">	<span class="comment">/* ipt_entry + matches + target 在内存中的大小 */</span></span><br><span class="line">	<span class="type">u_int16_t</span> next_offset;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/* 跳转后指向前一规则 */</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> comefrom;</span><br><span class="line">	<span class="comment">/* 数据包计数器 */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">xt_counters</span> <span class="title">counters</span>;</span></span><br><span class="line">	<span class="comment">/* 长度为0数组的特殊用法，作为 match 的内存地址 */</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">char</span> elems[<span class="number">0</span>];</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p><code>ipt_do_table</code> 首先根据 hook 类型以及 <code>xt_table.private.entries</code> 属性跳转到对应的规则集内存区域，执行如下过程：</p>
+<p><img src="/img/wiki-netfilter-iptables/9.jpg" alt="ipt_do_table"></p>
+<p>ipt_do_table</p>
+<ol>
+<li>首先检查数据包的 IP 首部与第一条规则 <code>ipt_entry</code> 的 <code>.ipt_ip</code> 属性是否一致，如不匹配根据 <code>next_offset</code> 属性跳转到下一条规则。</li>
+<li>若 IP 首部匹配 ，则开始依次检查该规则所定义的所有 <code>ipt_entry_match</code> 对象，与对象关联的匹配函数将被调用，根据调用返回值有返回到回调函数（以及是否丢弃数据包）、跳转到下一规则或继续检查等结果。</li>
+<li>所有检查通过后读取 <code>ipt_entry_target</code>，根据其属性返回 netfilter 向量到回调函数、继续下一规则或跳转到指定内存地址的其他规则，非标准 <code>ipt_entry_target</code> 还会调用被绑定的函数，但只能返回向量值不能跳转其他规则。</li>
+</ol>
+<h4 id="灵活性和更新时延"><a href="#灵活性和更新时延" class="headerlink" title="灵活性和更新时延"></a>灵活性和更新时延</h4><p>以上数据结构与执行方式为 iptables 提供了强大的扩展能力，我们可以灵活地自定义每条规则的匹配条件并根据结果执行不同行为，甚至还能在额外的规则集之间栈式跳转。</p>
+<p>由于每条规则长度不等、内部结构复杂，且同一规则集位于连续的内存空间，iptables 使用全量替换的方式来更新规则，这使得我们能够从用户空间以原子操作来添加&#x2F;删除规则，但非增量式的规则更新会在规则数量级较大时带来严重的性能问题：假如在一个大规模 Kubernetes 集群中使用 iptables 方式实现 Service，当 service 数量较多时，哪怕更新一个 service 也会整体修改 iptables 规则表。全量提交的过程会 kernel lock 进行保护，因此会有很大的更新时延。</p>
+<h3 id="用户空间的-tables、chains-和-rules"><a href="#用户空间的-tables、chains-和-rules" class="headerlink" title="用户空间的 tables、chains 和 rules"></a>用户空间的 tables、chains 和 rules</h3><p>用户空间的 iptables 命令行可以读取指定表的数据并渲染到终端，添加新的规则（实际上是替换整个 table 的规则表）等。</p>
+<p>iptables 主要操作以下几种对象：</p>
+<ul>
+<li>table：对应内核空间的 <code>xt_table</code> 结构，iptable 的所有操作都对指定的 table 执行，默认为 filter。</li>
+<li>chain：对应指定 table 通过特定 netfilter hook 调用的规则集，此外还可以自定义规则集，然后从 hook 规则集中跳转过去。</li>
+<li>rule：对应上文中 <code>ipt_entry</code>、<code>ipt_entry_match</code> 和 <code>ipt_entry_target</code>，定义了对数据包的匹配规则以及匹配后执行的行为。</li>
+<li>match：具有很强扩展性的自定义匹配规则。</li>
+<li>target：具有很强扩展性的自定义匹配后行为。</li>
+</ul>
+<p>基于上文介绍的代码调用过程流程，chain 和 rule 按如下示意图执行：</p>
+<p><img src="/img/wiki-netfilter-iptables/10.jpg" alt="iptables-chains"></p>
+<p>iptables-chains</p>
+<p>对于 iptables 具体的用法和指令本文不做详细介绍，可参考 Iptables Essentials: Common Firewall Rules and Commands | DigitalOcean[5]。</p>
+<h2 id="conntrack"><a href="#conntrack" class="headerlink" title="conntrack"></a>conntrack</h2><p>仅仅通过 3、4 层的首部信息对数据包进行过滤是不够的，有时候还需要进一步考虑连接的状态。netfilter 通过另一内置模块 <code>conntrack</code> 进行连接跟踪（connection tracking），以提供根据连接过滤、地址转换（NAT）等更进阶的网络过滤功能。由于需要对连接状态进行判断，<code>conntrack</code> 在整体机制相同的基础上，又针对协议特点有单独的实现。</p>
+<p>本来打算继续介绍 <code>conntrack</code> 和 NAT，但考虑到篇幅过长遂作罢，感兴趣的读者推荐阅读连接跟踪（conntrack）：原理、应用及 Linux 内核实现[6]。</p>
+<h2 id="参考链接"><a href="#参考链接" class="headerlink" title="参考链接"></a>参考链接</h2><ul>
+<li>netfilter.h - include&#x2F;linux&#x2F;netfilter.h - Linux source code (v2.6.39.4) - Bootlin[7]</li>
+<li>Network_stack.pdf[8]</li>
+<li>Linux netfilter Hacking HOWTO[9]</li>
+<li>Linux Kernel Networking: Implementation and Theory - Chapter 9: Netfilter[10]</li>
+<li>Netfilter framework providing hooks system for Nftables[11]</li>
+<li>A Deep Dive into Iptables and Netfilter Architecture | DigitalOcean[12]</li>
+<li>连接跟踪（conntrack）：原理、应用及 Linux 内核实现[13]</li>
+<li>Netfilter hooks - nftables wiki[14]</li>
+<li>Iptables Essentials: Common Firewall Rules and Commands | DigitalOcean[15]</li>
+<li>Comparing kube-proxy modes: iptables or IPVS?[16]</li>
+<li>Linux Conntrack: Why It Breaks Down and Avoiding the Problem[17]</li>
+<li>走进 Linux 内核之 Netfilter 框架 - 掘金[18]</li>
+<li>19.3 The Netfilter Architecture of Linux 2.4 | Linux Network Architecture[19]</li>
+</ul>
+<h3 id="引用链接"><a href="#引用链接" class="headerlink" title="引用链接"></a>引用链接</h3><p>[1] <code>net/ipv4/ip_forward.c</code>: <em><a target="_blank" rel="noopener" href="https://elixir.bootlin.com/linux/v2.6.39.4/source/net/ipv4/ip/_forward.c#L115">https://elixir.bootlin.com/linux/v2.6.39.4/source/net/ipv4/ip\_forward.c#L115</a></em></p>
+<p>[2]
+iptable_filter.c: <em><a target="_blank" rel="noopener" href="https://elixir.bootlin.com/linux/v2.6.39.4/source/net/ipv4/netfilter/iptable/_filter.c#L87">https://elixir.bootlin.com/linux/v2.6.39.4/source/net/ipv4/netfilter/iptable\_filter.c#L87</a></em></p>
+<p>[3]
+iptable_filter_hook: <em><a target="_blank" rel="noopener" href="https://elixir.bootlin.com/linux/v2.6.39.4/C/ident/iptable/_filter/_hook">https://elixir.bootlin.com/linux/v2.6.39.4/C/ident/iptable\_filter\_hook</a></em></p>
+<p>[4]
+ipt_do_table: <em><a target="_blank" rel="noopener" href="https://elixir.bootlin.com/linux/v2.6.39.4/C/ident/ipt/_do/_table">https://elixir.bootlin.com/linux/v2.6.39.4/C/ident/ipt\_do\_table</a></em></p>
+<p>[5]
+Iptables Essentials: Common Firewall Rules and Commands | DigitalOcean: <em><a target="_blank" rel="noopener" href="https://www.digitalocean.com/community/tutorials/iptables-essentials-common-firewall-rules-and-commands">https://www.digitalocean.com/community/tutorials/iptables-essentials-common-firewall-rules-and-commands</a></em></p>
+<p>[6]
+连接跟踪（conntrack）：原理、应用及 Linux 内核实现: <em><a target="_blank" rel="noopener" href="https://arthurchiao.art/blog/conntrack-design-and-implementation-zh/#hook-%E4%BC%98%E5%85%88%E7%BA%A7">https://arthurchiao.art/blog/conntrack-design-and-implementation-zh/#hook-优先级</a></em></p>
+<p>[7]
+netfilter.h - include&#x2F;linux&#x2F;netfilter.h - Linux source code (v2.6.39.4) - Bootlin: <em><a target="_blank" rel="noopener" href="https://elixir.bootlin.com/linux/v2.6.39.4/source/include/linux/netfilter.h">https://elixir.bootlin.com/linux/v2.6.39.4/source/include/linux/netfilter.h</a></em></p>
+<p>[8]
+Network_stack.pdf: <em><a target="_blank" rel="noopener" href="https://www.cs.dartmouth.edu//~sergey/netreads/path-of-packet/Network/_stack.pdf">https://www.cs.dartmouth.edu/\~sergey/netreads/path-of-packet/Network\_stack.pdf</a></em></p>
+<p>[9]
+Linux netfilter Hacking HOWTO: <em><a target="_blank" rel="noopener" href="https://www.netfilter.org/documentation/HOWTO/netfilter-hacking-HOWTO.html#toc3">https://www.netfilter.org/documentation/HOWTO/netfilter-hacking-HOWTO.html#toc3</a></em></p>
+<p>[10]
+Linux Kernel Networking: Implementation and Theory - Chapter 9: Netfilter: <em><a target="_blank" rel="noopener" href="https://link.springer.com/book/10.1007/978-1-4302-6197-1">https://link.springer.com/book/10.1007/978-1-4302-6197-1</a></em></p>
+<p>[11]
+Netfilter framework providing hooks system for Nftables: <em><a target="_blank" rel="noopener" href="https://www.teldat.com/blog/nftables-and-netfilter-hooks-via-linux-kernel/">https://www.teldat.com/blog/nftables-and-netfilter-hooks-via-linux-kernel/</a></em></p>
+<p>[12]
+A Deep Dive into Iptables and Netfilter Architecture | DigitalOcean: <em><a target="_blank" rel="noopener" href="https://www.digitalocean.com/community/tutorials/a-deep-dive-into-iptables-and-netfilter-architecture">https://www.digitalocean.com/community/tutorials/a-deep-dive-into-iptables-and-netfilter-architecture</a></em></p>
+<p>[13]
+连接跟踪（conntrack）：原理、应用及 Linux 内核实现: <em><a target="_blank" rel="noopener" href="https://arthurchiao.art/blog/conntrack-design-and-implementation-zh/#hook-%E4%BC%98%E5%85%88%E7%BA%A7">https://arthurchiao.art/blog/conntrack-design-and-implementation-zh/#hook-优先级</a></em></p>
+<p>[14]
+Netfilter hooks - nftables wiki: <em><a target="_blank" rel="noopener" href="https://wiki.nftables.org/wiki-nftables/index.php/Netfilter/_hooks">https://wiki.nftables.org/wiki-nftables/index.php/Netfilter\_hooks</a></em></p>
+<p>[15]
+Iptables Essentials: Common Firewall Rules and Commands | DigitalOcean: <em><a target="_blank" rel="noopener" href="https://www.digitalocean.com/community/tutorials/iptables-essentials-common-firewall-rules-and-commands">https://www.digitalocean.com/community/tutorials/iptables-essentials-common-firewall-rules-and-commands</a></em></p>
+<p>[16]
+Comparing kube-proxy modes: iptables or IPVS?: <em><a target="_blank" rel="noopener" href="https://www.tigera.io/blog/comparing-kube-proxy-modes-iptables-or-ipvs/">https://www.tigera.io/blog/comparing-kube-proxy-modes-iptables-or-ipvs/</a></em></p>
+<p>[17]
+Linux Conntrack: Why It Breaks Down and Avoiding the Problem: <em><a target="_blank" rel="noopener" href="https://www.tigera.io/blog/when-linux-conntrack-is-no-longer-your-friend/">https://www.tigera.io/blog/when-linux-conntrack-is-no-longer-your-friend/</a></em></p>
+<p>[18]
+走进 Linux 内核之 Netfilter 框架 - 掘金: <em><a target="_blank" rel="noopener" href="https://juejin.cn/post/7008945265021288484">https://juejin.cn/post/7008945265021288484</a></em></p>
+<p>[19]
+19.3 The Netfilter Architecture of Linux 2.4 | Linux Network Architecture: <em><a target="_blank" rel="noopener" href="https://flylib.com/books/en/3.475.1.101/1/">https://flylib.com/books/en/3.475.1.101/1/</a></em></p>
+<article class="message message-immersive is-primary">
+<div class="message-body">
+<i class="fas fa-globe-asia mr-2"></i>本文来自
+<a target="_blank" rel="noopener" href="https://www.waynerv.com/posts/understanding-netfilter-and-iptables/">waynerv</a>.
+</div>
+</article>
+
+</div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/Linux%E7%BD%91%E7%BB%9C/">Linux网络</a></div><!--!--><div><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6757924689439593" crossOrigin="anonymous"></script><ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-6757924689439593" data-ad-slot="2352785969"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div></article></div><!--!--><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/pages/wiki-k8s-service/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">一文了解k8s service</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/pages/wiki-network/"><span class="level-item">一文了解集线器、交换机、路由器、MAC地址、IP地址和ARP</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--><div style="width:100%"><script src="https://giscus.app/client.js" data-repo="thetechstack/thetechstack.github.io" data-repo-id="R_kgDOG6Ti1Q" data-category="Announcements" data-category-id="DIC_kwDOG6Ti1c4COQtm" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light" data-lang="zh-CN" crossOrigin="anonymous" async></script></div></div><!--!--><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen  order-3 is-sticky"><div class="card widget" id="toc" data-type="toc"><div class="card-content"><div class="menu"><h3 class="menu-label">目录</h3><ul class="menu-list"><li><a class="level is-mobile" href="#Netfilter-的设计与实现"><span class="level-left"><span class="level-item">1</span><span class="level-item">Netfilter 的设计与实现</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#数据包的内核之旅"><span class="level-left"><span class="level-item">1.1</span><span class="level-item">数据包的内核之旅</span></span></a></li><li><a class="level is-mobile" href="#netfilter-hooks"><span class="level-left"><span class="level-item">1.2</span><span class="level-item">netfilter hooks</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#hook-触发点"><span class="level-left"><span class="level-item">1.2.1</span><span class="level-item">hook 触发点</span></span></a></li><li><a class="level is-mobile" href="#NF-HOOK-宏和-netfilter-向量"><span class="level-left"><span class="level-item">1.2.2</span><span class="level-item">NF_HOOK 宏和 netfilter 向量</span></span></a></li></ul></li><li><a class="level is-mobile" href="#回调函数与优先级"><span class="level-left"><span class="level-item">1.3</span><span class="level-item">回调函数与优先级</span></span></a></li></ul></li><li><a class="level is-mobile" href="#iptables"><span class="level-left"><span class="level-item">2</span><span class="level-item">iptables</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#内核空间模块"><span class="level-left"><span class="level-item">2.1</span><span class="level-item">内核空间模块</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#xt-table-的初始化"><span class="level-left"><span class="level-item">2.1.1</span><span class="level-item">xt_table 的初始化</span></span></a></li><li><a class="level is-mobile" href="#ipt-do-table"><span class="level-left"><span class="level-item">2.1.2</span><span class="level-item">ipt_do_table()</span></span></a></li><li><a class="level is-mobile" href="#灵活性和更新时延"><span class="level-left"><span class="level-item">2.1.3</span><span class="level-item">灵活性和更新时延</span></span></a></li></ul></li><li><a class="level is-mobile" href="#用户空间的-tables、chains-和-rules"><span class="level-left"><span class="level-item">2.2</span><span class="level-item">用户空间的 tables、chains 和 rules</span></span></a></li></ul></li><li><a class="level is-mobile" href="#conntrack"><span class="level-left"><span class="level-item">3</span><span class="level-item">conntrack</span></span></a></li><li><a class="level is-mobile" href="#参考链接"><span class="level-left"><span class="level-item">4</span><span class="level-item">参考链接</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#引用链接"><span class="level-left"><span class="level-item">4.1</span><span class="level-item">引用链接</span></span></a></li></ul></li></ul></div></div><style>#toc .menu-list > li > a.is-active + .menu-list { display: block; }#toc .menu-list > li > a + .menu-list { display: none; }</style><script src="/js/toc.js" defer></script></div><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg"></figure><p class="is-size-6 is-block">公众号：面向问题编程</p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives"><p class="title">38</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories"><p class="title">4</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags"><p class="title">11</p></a></div></div></nav></div></div><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/"><span class="level-start"><span class="level-item">一文了解</span></span><span class="level-end"><span class="level-item tag">17</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/"><span class="level-start"><span class="level-item">技术架构</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BB%BC%E8%BF%B0/"><span class="level-start"><span class="level-item">综述</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E9%97%AE%E9%A2%98/"><span class="level-start"><span class="level-item">问题</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li></ul></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a><p class="is-size-7"><span>&copy; 2022 面向问题编程</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-CN");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/lg-zoom@1.3.0/dist/lg-zoom.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script type="text/x-mathjax-config">MathJax.Hub.Config({
+            'HTML-CSS': {
+                matchFontHeight: false
+            },
+            SVG: {
+                matchFontHeight: false
+            },
+            CommonHTML: {
+                matchFontHeight: false
+            },
+            tex2jax: {
+                inlineMath: [
+                    ['$','$'],
+                    ['\\(','\\)']
+                ]
+            }
+        });</script><script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.9/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script><!--!--><!--!--><!--!--><script src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script src="/js/insight.js" defer></script><script>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script></body></html>
