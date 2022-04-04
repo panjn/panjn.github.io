@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><title>爱奇艺视频生产 Kubernetes 集群优化实践：感知业务优先级 - 面向问题编程</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="面向问题编程"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="面向问题编程"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="本文介绍爱奇艺针对视频生产场景、在 Kubernetes（以下简称 K8s） 集群优化方面的实践：如何使高优先级任务获得更多的 CPU 资源，更快完成任务。"><meta property="og:type" content="blog"><meta property="og:title" content="爱奇艺视频生产 Kubernetes 集群优化实践：感知业务优先级"><meta property="og:url" content="https://www.heapoverflow.cn/pages/practice-iqiyi-k8s-1/"><meta property="og:site_name" content="面向问题编程"><meta property="og:description" content="本文介绍爱奇艺针对视频生产场景、在 Kubernetes（以下简称 K8s） 集群优化方面的实践：如何使高优先级任务获得更多的 CPU 资源，更快完成任务。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://www.heapoverflow.cn/img/practice-iqiyi-k8s-1/0.jpg"><meta property="article:published_time" content="2022-04-04T11:59:13.867Z"><meta property="article:modified_time" content="2022-04-04T12:02:43.315Z"><meta property="article:author" content="面向问题编程"><meta property="article:tag" content="Kubernetes"><meta property="twitter:card" content="summary"><meta property="twitter:image" content="/img/practice-iqiyi-k8s-1/0.jpg"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.heapoverflow.cn/pages/practice-iqiyi-k8s-1/"},"headline":"爱奇艺视频生产 Kubernetes 集群优化实践：感知业务优先级","image":["https://www.heapoverflow.cn/img/practice-iqiyi-k8s-1/0.jpg"],"datePublished":"2022-04-04T11:59:13.867Z","dateModified":"2022-04-04T12:02:43.315Z","author":{"@type":"Person","name":"面向问题编程"},"publisher":{"@type":"Organization","name":"面向问题编程","logo":{"@type":"ImageObject","url":"https://www.heapoverflow.cn/img/logo.svg"}},"description":"本文介绍爱奇艺针对视频生产场景、在 Kubernetes（以下简称 K8s） 集群优化方面的实践：如何使高优先级任务获得更多的 CPU 资源，更快完成任务。"}</script><link rel="canonical" href="https://www.heapoverflow.cn/pages/practice-iqiyi-k8s-1/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><script src="https://www.googletagmanager.com/gtag/js?id=G-ETGL163DQH" async></script><script>window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    
+        gtag('config', 'G-ETGL163DQH');</script><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><script data-ad-client="ca-pub-6757924689439593" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+          Array
+              .from(document.querySelectorAll('.tab-content'))
+              .forEach($tab => {
+                  $tab.classList.add('is-hidden');
+              });
+          Array
+              .from(document.querySelectorAll('.tabs li'))
+              .forEach($tab => {
+                  $tab.classList.remove('is-active');
+              });
+          const $activeTab = document.querySelector(location.hash);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+          const $tabMenu = document.querySelector(`a[href="${location.hash}"]`);
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 6.0.0"></head><body class="is-2-column"><nav class="navbar navbar-main"><div class="container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/categories/%E9%97%AE%E9%A2%98/">问题</a><a class="navbar-item" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/">技术架构</a><a class="navbar-item" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></div><div class="navbar-end"><a class="navbar-item" rel="noopener" title="分类" href="/categories">分类</a><a class="navbar-item" rel="noopener" title="标签" href="/tags">标签</a><a class="navbar-item" rel="noopener" title="归档" href="/archives">归档</a><a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;"><i class="fas fa-list-ul"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-9-widescreen"><div class="card"><div class="card-image"><span class="image is-7by3"><img class="fill" src="/img/practice-iqiyi-k8s-1/0.jpg" alt="爱奇艺视频生产 Kubernetes 集群优化实践：感知业务优先级"></span></div><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-04-04T11:59:13.867Z" title="2022/4/4 下午7:59:13">2022-04-04</time>发表</span><span class="level-item"><time dateTime="2022-04-04T12:02:43.315Z" title="2022/4/4 下午8:02:43">2022-04-04</time>更新</span><span class="level-item"><a class="link-muted" href="/categories/%E6%8A%80%E6%9C%AF%E5%AE%9E%E8%B7%B5/">技术实践</a></span><span class="level-item">23 分钟读完 (大约3513个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">爱奇艺视频生产 Kubernetes 集群优化实践：感知业务优先级</h1><div class="content"><p>本文介绍爱奇艺针对视频生产场景、在 Kubernetes（以下简称 K8s） 集群优化方面的实践：如何使高优先级任务获得更多的 CPU 资源，更快完成任务。</p>
+<span id="more"></span>
+
+<p>01</p>
+<h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>视频生产集群所面临的一个挑战是 K8s 原生机制无法区分业务优先级。视频生产任务拥有不同的业务优先级和资源需求，业务优先级是根据视频节目的重要程度及上线时间的紧迫程度进行区分的，重点节目相关的任务优先级高，上线时间紧迫的任务优先级高，其他节目的优先级低。  </p>
+<p>资源需求是从任务类型维度区分，如超清视频任务需要 8 CPU，普通视频任务需要 4 CPU。因此存在低优先级任务和高优先级任务申请相同数量 CPU 的情况，例如高优先级超清视频任务和低优先级超清视频任务都申请 8 CPU。</p>
+<p>K8s 原生机制并不感知业务优先级，在上述情况下会给两者分配同样多的 CPU 资源。用户期望高优先级任务可以抢占低优先级任务的 CPU 资源，从而更快执行。</p>
+<p>业界也提出了类似于业务优先级的概念，如文章 [1] 中提出的应用优先级，但是并未给出具体的解决方案。本文介绍了一种允许高优先级任务抢占低优先级任务 CPU 资源，加速高优先级任务执行的方案。该方案不仅可以在提交任务时指定优先级，还可以对执行过程中的任务进行优先级调整，满足视频生产效率要求。</p>
+<p>02</p>
+<h2 id="原理概述"><a href="#原理概述" class="headerlink" title="原理概述"></a>原理概述</h2><p>为了给高优先级任务提供更多的 CPU 资源，我们在集群中每个物理节点上运行一个代理服务进程，该代理进程会区分节点上任务的优先级，将高优先级任务对应的 Cgroups cpu 子系统中控制 CPU 使用量的值调高，从而允许高优先级任务可以抢占低优先级任务的 CPU 资源，使其更快地执行。这个方案依赖于 K8s 集群中各个节点关闭 CPU 限流，从而使高优先级任务可以自由抢占低优先级任务的 CPU 资源，不会受到 CPU 限流的影响。</p>
+<p>03</p>
+<h2 id="高优先级任务-CPU-抢占"><a href="#高优先级任务-CPU-抢占" class="headerlink" title="高优先级任务 CPU 抢占"></a>高优先级任务 CPU 抢占</h2><h3 id="1、前提：关闭节点-CPU-限流"><a href="#1、前提：关闭节点-CPU-限流" class="headerlink" title="1、前提：关闭节点 CPU 限流"></a>1、前提：关闭节点 CPU 限流</h3><p>在 K8s 中，任务以 Pod 形式存在，其 CPU 资源分配和使用受到 Pod 元数据中两个字段控制：CPU Resource Requests 和 CPU Resource Limits，Pod 可使用的 CPU 总量介于两者之间。CPU Resource Requests 为 Pod 提供了最少 CPU 保证，该字段的值会写入到 Pod 对应的 Cgroups cpu 子系统 cpu.shares 文件中，通过 cpu.shares 保证 Pod 使用的资源量。CPU Resource Limits 为 Pod 提供 CPU 使用上限，它的值对应到 Cgroups cpu 子系统的 cpu.cfs_quota_us 和 cpu.cfs_period_us 文件，具体对应关系请参考文章 [2]。</p>
+<p>为了解除 CPU Resource Limits 对 Pod 的 CPU 限流，我们在视频生产 K8s 集群中通过 kubelet 的配置项 ‘–cpu-cfs-quota&#x3D;false’ 关闭了 CPU CFS Quota，允许高优先级 Pod 自由抢占低优先级 Pod 的 CPU 资源而不会受到限流。</p>
+<p>顺便一提，关闭 CPU CFS Quota 之后，Pod 在需要时，可以超额使用节点上存空闲的 CPU，提升了集群的 CPU 利用率和 Pod 的执行效率。</p>
+<h3 id="2、整体设计"><a href="#2、整体设计" class="headerlink" title="2、整体设计"></a>2、整体设计</h3><p>该方案的名字为 cpu-share-syncer，基本原理章节中已经概述了其思想，整体设计如图 1 所示：</p>
+<p><img src="/img/practice-iqiyi-k8s-1/0.jpg"></p>
+<p>图1 cpu-share-syncer 总体设计</p>
+<p>该方案的核心组件是 cpu-share-syncer 代理服务，它运行于 K8s 各个工作节点之上，并通过与 K8s master 节点之上的 kube-apiserver 进程通信，获取其所在节点上的 Pod 信息，然后识别出节点上的高优先级 Pod，将这些 Pod 对应的 Cgroups cpu 子系统中 cpu.shares 文件值设置为用户指定的较高的值，从而赋予其较高的 CPU 权重，允许这些 Pod 抢占其他 Pod 的 CPU 资源。</p>
+<h3 id="3、使用方式"><a href="#3、使用方式" class="headerlink" title="3、使用方式"></a>3、使用方式</h3><p>cpu-share-syncer 代理服务采用 K8s 中 DaemonSet 控制器的方式进行部署，使得每个 K8s 工作节点之上都运行了一个代理服务 Pod，这些 Pod 通过 hostpath 的方式挂载了宿主机 Cgroups 路径以调整 Pod 对应的 cpu.shares 文件。</p>
+<p>代理服务如何知道哪些 Pod 是高优先级任务呢？这需要用户在创建高优先级 Pod 时，在 Pod 的注解字段中添加一个表示较高 CPU 权重的 annotation：iqiyi.com&#x2F;cpu-share，该注解值的类型为整数，在含义上与 CPU Resource Requests 类似，因此用户可以根据 CPU Resource Requests 字段的规则来设置 iqiyi.com&#x2F;cpu-share 的值，只是 iqiyi.com&#x2F;cpu-share 仅支持以一个 CPU 的 1&#x2F;1024 为单位。例如，如果期望 Pod 在运行时可以使用 10 CPU 的资源，iqiyi.com&#x2F;cpu-share 的值应该设置为10 * 1024 &#x3D; 10240，这和 Cgroups 中对 CPU 的计量单位保持一致。对于已经运行的 Pod，用户可以通过 patch 方式在 Pod 注解字段中添加 iqiyi.com&#x2F;cpu-share 注解改变任务的优先级。</p>
+<p>cpu-share-syncer 代理服务检测到 Pod 中存在这个 annotation，就会将其值写入到 Pod 对应 cpu.shares 文件中，达到用户指定 Pod CPU 权重的目的。</p>
+<p>因此，对于设置了 iqiyi.com&#x2F;cpu-share annotation 的 Pod，会按照 CPU Resource Requests 字段的值进行调度，按照 iqiyi.com&#x2F;cpu-share的值在节点上分配 CPU 资源。</p>
+<p>iqiyi.com&#x2F;cpu-share 的值越大，Pod 对 CPU 的权重就越高，抢占其他 Pod CPU 资源就会越多。对于高优先级 Pod，用户可以根据需要将 iqiyi.com&#x2F;cpu-share 的值设置为较高的值，获取更多的 CPU 资源。</p>
+<h3 id="4、技术细节"><a href="#4、技术细节" class="headerlink" title="4、技术细节"></a>4、技术细节</h3><p>cpu-share-syncer 代理服务的详细工作流程如图 2 所示：</p>
+<p><img src="/img/practice-iqiyi-k8s-1/1.jpg"></p>
+<p>图2  cpu-share-syncer 详细处理流程</p>
+<p>cpu-share-syncer 代理是一个长生命周期的任务，它会周期性地将用户通过 Pod annotation 指定的 CPU 权重写入到 Pod 对应的 cpu.shares 文件中，周期性执行的原因是防止 Pod 由于某种原因重启之后，用户指定的 CPU 权重丢失。周期可以由用户进行配置，默认与 kubelet 进程中 CPUManager 同步周期（默认 10 秒）保持一致。需要注意的是，kubelet 中 CPUManager 会周期性的同步 Pod 中容器对应的 cpu.shares 文件，该操作仅会影响 Pod 内容器之间的相对优先级，详细信息可参考 [3]。而 cpu-share-syncer 代理同步的是 Pod 自身对应的 cpu.shares 文件，该同步工作会改变整个 Pod 相对于其他 Pod 的优先级。两个同步操作互不影响。</p>
+<p>cpu-share-syncer 代理会从 master上的 kube-apiserver 进程获取其所在节点上的 Pod 信息，为了避免每次全量从 kube-apiserver 获取节点上所有 Pod 信息，减轻 kube-apiserver 的负担，使用 List-Watch 的方式获取。</p>
+<p>在获取节点上所有 Pod 之后，cpu-share-syncer 代理会对这些 Pod 进行遍历，并从 Pod 注解中取出 iqiyi.com&#x2F;cpu-share 对应的值。然后根据 Pod UID 找到其对应的 cpu.shares 文件，将获取的值写入到这个文件中。对于用户未指定优先级的 Pod，cpu-share-syncer 不进行处理，这些 Pod 对应的 cpu.shares 值仍为 CPU Resource Requests 对应的值，例如 1 核的 CPU 申请对应的 cpu.shares 仍为 1024，没有被改动。这样高优先级 Pod 在节点上就被赋予更高的 CPU 权重，因而可以抢占其他 Pod 的 CPU 资源，从而更快地执行。</p>
+<p>04</p>
+<h2 id="cpu-share-syncer-测试结果"><a href="#cpu-share-syncer-测试结果" class="headerlink" title="cpu-share-syncer 测试结果"></a>cpu-share-syncer 测试结果</h2><p>为了验证 cpu-share-syncer 的效果及其带来的收益，我们进行了单机功能验证和线上环境灰度测试。我们在 K8s 集群中的一个节点上，运行了两个 Pod，将它们的 CPU Resource Requests 值都设置为 10，并分别设置其 iqiyi.com&#x2F;cpu-share 的值为 8192 及 16384，两个 Pod 中执行相同的压力测试命令 ‘stress --cpu 40’，表示每个 Pod 启动 40 个线程对 CPU 性能进行压力测试。使用 prometheus 收集相关指标，测试结果如下图所示：</p>
+<p><img src="/img/practice-iqiyi-k8s-1/2.jpg"></p>
+<p>图3 两个 Pod 对比验证</p>
+<p>图中横轴表示时钟时间，纵轴表示 Pod 运行所占用的 CPU 总时间，单位为秒，蓝色折线表示权重为 16384 的 Pod 执行所占用的 CPU 时间，黄色折线表示权重为 8192 的 Pod 执行所占用的 CPU 时间，可观察到这两个 Pod 所耗费的 CPU 时间比例大约为 2:1，说明Pod CPU 权重已经生效，图中由于两个 Pod 启动先后顺序问题，存在一定的误差。</p>
+<p>随后在相同的节点上运行 3 个 CPU Resource Requests 为 10 CPU 的 Pod，不指定 CPU 权重，在运行一段时间后，再次启动一个 CPU Resource Requests 为 10 CPU 的 Pod，并指定其权重值为 262144 (表示极高的优先级，这是 cpu.shares 允许的最大值，参考 [4] )，在这四个 Pod 中执行的命令同样为 ‘stress --cpu 40’，测试结果如下图所示：</p>
+<p><img src="/img/practice-iqiyi-k8s-1/3.jpg"></p>
+<p>图4 高优先级 Pod 抢占 CPU 时间</p>
+<p>图中坐标轴含义与上图一致，黄绿蓝三条折线表示先启动的三个 Pod，红色折线表示后启动的一个高优先级的 Pod。可以明显观察到，高优先级的 Pod 启动后，它所占用的 CPU 总时间大幅度高速增长，而早期启动的三个 Pod 由于受到高优先级 Pod 的挤压，所占用的 CPU 总时间几乎保持不变，说明高优先级任务抢占了早期 Pod 的 CPU 资源。</p>
+<p>随后我们在一个线上 K8s 集群中，进行了灰度测试，对 50% 的常规视频生产任务指定了 CPU 权重 262144，另外 50% 生产任务未指定 CPU 权重，并观察其两组任务的平均执行效率，得到如下所示的结果：</p>
+<p><img src="/img/practice-iqiyi-k8s-1/4.jpg"></p>
+<p>图5 生产环境灰度验证</p>
+<p>图中横轴为时钟时间，纵轴为任务执行耗时比（执行时间&#x2F;介质大小），耗时比越小效率越高，绿色折线表示未指定 CPU 权重的任务，蓝色折线表示指定了高 CPU 权重的任务。发现相较于未添加 CPU 权重的任务，高 CPU 权重的 Pod 执行效率提升了约 16%，实现了对高优先级任务加速的目的。</p>
+<p>需要注意的是，从 CPU 权重（cpu.shares）比例来看，当高优先级任务存在且持续忙碌时，低优先级任务仅能获得非常少的 CPU 资源，参考 [5]，效率提升会远不止 16%。经过分析，我们发现灰度环境中的高优先级视频生产任务即使在完全放开 CPU 限流时，也不会吃掉机器上所有的 CPU 资源，它只占用自己所需的 CPU 资源。因此，灰度环境中的高优先级任务只是抢占了一部分低优先级任务的 CPU 资源满足自己的需求。另外，视频生产任务在整个生命周期中，需要经过从远端服务器下载原始数据、集群中处理、将结果上传到远端服务器三个过程。在下载、上传数据等待 IO 的过程中，高优先级任务不需要占用 CPU 资源，此时，低优先级任务可以再次获得一部分 CPU 资源。综合上面两部分原因，我们认为高优先级任务执行效率提升 16% 是合理的。</p>
+<p>05</p>
+<h2 id="总结及展望"><a href="#总结及展望" class="headerlink" title="总结及展望"></a>总结及展望</h2><p>我们通过 cpu-share-syncer 在关闭了 CPU CFS Quota 的 K8s 集群中提供了高优先级任务优先使用 CPU 的能力，实现了对高优先级任务的加速。目前 cpu-share-syncer 已经广泛运行在爱奇艺视频生产集群中，为高优先级任务护航。</p>
+<p>cpu-share-syncer 目前仅运行在工作节点上，未在调度层面对高优先级任务进行识别，可能会出现多个高优先级任务调度到同一个节点，并发生资源竞争的情况，后续我们会继续在调度层面进行优化，使高优先级任务尽量均匀分布在各个节点之上。</p>
+<p>  引用  </p>
+<ol>
+<li><p><a target="_blank" rel="noopener" href="https://tech.meituan.com/2019/08/22/kubernetes-cluster-management-practice.html">https://tech.meituan.com/2019/08/22/kubernetes-cluster-management-practice.html</a></p>
+</li>
+<li><p><a target="_blank" rel="noopener" href="https://www.cnblogs.com/sunsky303/p/11544540.html">https://www.cnblogs.com/sunsky303/p/11544540.html</a></p>
+</li>
+<li><p><a target="_blank" rel="noopener" href="https://kubernetes.io/zh/docs/tasks/administer-cluster/cpu-management-policies/">https://kubernetes.io/zh/docs/tasks/administer-cluster/cpu-management-policies/</a></p>
+</li>
+<li><p><a target="_blank" rel="noopener" href="https://www.freedesktop.org/software/systemd/man/systemd.resource-control.html">https://www.freedesktop.org/software/systemd/man/systemd.resource-control.html</a></p>
+</li>
+<li><p><a target="_blank" rel="noopener" href="https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/scheduler/sched-design-CFS.rst/?h=v5.17-rc1">https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/scheduler/sched-design-CFS.rst\?h=v5.17-rc1</a></p>
+</li>
+</ol>
+<article class="message message-immersive is-primary">
+<div class="message-body">
+<i class="fas fa-globe-asia mr-2"></i>本文来自
+<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/Sqge85YXiBcJIpIJ77ZdDQ">爱奇艺的技术产品团队</a>.
+</div>
+</article>
+    </div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/Kubernetes/">Kubernetes</a></div><!--!--><div><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6757924689439593" crossOrigin="anonymous"></script><ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-6757924689439593" data-ad-slot="2352785969"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div></article></div><!--!--><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/pages/practice-zuoyebang-k8s-1/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">作业帮 Kubernetes 原生调度器优化实践</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/pages/practice-meitun-k8s-3/"><span class="level-item">美团弹性伸缩系统的技术演进与落地实践</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--><div style="width:100%"><script src="https://giscus.app/client.js" data-repo="thetechstack/thetechstack.github.io" data-repo-id="R_kgDOG6Ti1Q" data-category="Announcements" data-category-id="DIC_kwDOG6Ti1c4COQtm" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light" data-lang="zh-CN" crossOrigin="anonymous" async></script></div></div><!--!--><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen  order-3 is-sticky"><div class="card widget" id="toc" data-type="toc"><div class="card-content"><div class="menu"><h3 class="menu-label">目录</h3><ul class="menu-list"><li><a class="level is-mobile" href="#背景"><span class="level-left"><span class="level-item">1</span><span class="level-item">背景</span></span></a></li><li><a class="level is-mobile" href="#原理概述"><span class="level-left"><span class="level-item">2</span><span class="level-item">原理概述</span></span></a></li><li><a class="level is-mobile" href="#高优先级任务-CPU-抢占"><span class="level-left"><span class="level-item">3</span><span class="level-item">高优先级任务 CPU 抢占</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#1、前提：关闭节点-CPU-限流"><span class="level-left"><span class="level-item">3.1</span><span class="level-item">1、前提：关闭节点 CPU 限流</span></span></a></li><li><a class="level is-mobile" href="#2、整体设计"><span class="level-left"><span class="level-item">3.2</span><span class="level-item">2、整体设计</span></span></a></li><li><a class="level is-mobile" href="#3、使用方式"><span class="level-left"><span class="level-item">3.3</span><span class="level-item">3、使用方式</span></span></a></li><li><a class="level is-mobile" href="#4、技术细节"><span class="level-left"><span class="level-item">3.4</span><span class="level-item">4、技术细节</span></span></a></li></ul></li><li><a class="level is-mobile" href="#cpu-share-syncer-测试结果"><span class="level-left"><span class="level-item">4</span><span class="level-item">cpu-share-syncer 测试结果</span></span></a></li><li><a class="level is-mobile" href="#总结及展望"><span class="level-left"><span class="level-item">5</span><span class="level-item">总结及展望</span></span></a></li></ul></div></div><style>#toc .menu-list > li > a.is-active + .menu-list { display: block; }#toc .menu-list > li > a + .menu-list { display: none; }</style><script src="/js/toc.js" defer></script></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/Feed%E6%9C%8D%E5%8A%A1/"><span class="tag">Feed服务</span><span class="tag">3</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Knative/"><span class="tag">Knative</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Kubernetes/"><span class="tag">Kubernetes</span><span class="tag">21</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Linux%E7%BD%91%E7%BB%9C/"><span class="tag">Linux网络</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Serverless/"><span class="tag">Serverless</span><span class="tag">5</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Yarn/"><span class="tag">Yarn</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E4%B8%80%E8%87%B4%E6%80%A7/"><span class="tag">分布式一致性</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%9C%A8%E7%A6%BB%E7%BA%BF%E6%B7%B7%E9%83%A8/"><span class="tag">在离线混部</span><span class="tag">4</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/"><span class="tag">大数据</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%99%BA%E8%83%BD%E8%BF%90%E7%BB%B4/"><span class="tag">智能运维</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E8%99%9A%E6%8B%9F%E5%8C%96/"><span class="tag">网络虚拟化</span><span class="tag">3</span></a></div></div></div></div></div><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg"></figure><p class="is-size-6 is-block">公众号：面向问题编程</p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives"><p class="title">50</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories"><p class="title">5</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags"><p class="title">11</p></a></div></div></nav></div></div><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/"><span class="level-start"><span class="level-item">一文了解</span></span><span class="level-end"><span class="level-item tag">23</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E5%AE%9E%E8%B7%B5/"><span class="level-start"><span class="level-item">技术实践</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/"><span class="level-start"><span class="level-item">技术架构</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BB%BC%E8%BF%B0/"><span class="level-start"><span class="level-item">综述</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E9%97%AE%E9%A2%98/"><span class="level-start"><span class="level-item">问题</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li></ul></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a><p class="is-size-7"><span>&copy; 2022 面向问题编程</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-CN");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/lg-zoom@1.3.0/dist/lg-zoom.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script type="text/x-mathjax-config">MathJax.Hub.Config({
+            'HTML-CSS': {
+                matchFontHeight: false
+            },
+            SVG: {
+                matchFontHeight: false
+            },
+            CommonHTML: {
+                matchFontHeight: false
+            },
+            tex2jax: {
+                inlineMath: [
+                    ['$','$'],
+                    ['\\(','\\)']
+                ]
+            }
+        });</script><script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.9/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script><!--!--><!--!--><!--!--><script src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script src="/js/insight.js" defer></script><script>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script></body></html>

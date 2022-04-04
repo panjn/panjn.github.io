@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><title>作业帮 Kubernetes 原生调度器优化实践 - 面向问题编程</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="面向问题编程"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="面向问题编程"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="吕亚霖，2019年加入作业帮，作业帮架构研发负责人，在作业帮期间主导了云原生架构演进、推动实施容器化改造、服务治理、GO微服务框架、DevOps的落地实践。 简介调度系统的本质是为计算服务&amp;#x2F;任务匹配合适的资源，使其能够稳定高效地运行，以及在此的基础上进一步提高资源使用密度，而影响应用运行的因素非常多，比如 CPU、内存、IO、差异化的资源设备等等一系列因素都会影响应用运行的表现。同时，单"><meta property="og:type" content="blog"><meta property="og:title" content="作业帮 Kubernetes 原生调度器优化实践"><meta property="og:url" content="https://www.heapoverflow.cn/pages/practice-zuoyebang-k8s-1/"><meta property="og:site_name" content="面向问题编程"><meta property="og:description" content="吕亚霖，2019年加入作业帮，作业帮架构研发负责人，在作业帮期间主导了云原生架构演进、推动实施容器化改造、服务治理、GO微服务框架、DevOps的落地实践。 简介调度系统的本质是为计算服务&amp;#x2F;任务匹配合适的资源，使其能够稳定高效地运行，以及在此的基础上进一步提高资源使用密度，而影响应用运行的因素非常多，比如 CPU、内存、IO、差异化的资源设备等等一系列因素都会影响应用运行的表现。同时，单"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://www.heapoverflow.cn/img/practice-zuoyebang-k8s-1/0.jpg"><meta property="article:published_time" content="2022-04-04T12:06:09.095Z"><meta property="article:modified_time" content="2022-04-04T12:08:14.889Z"><meta property="article:author" content="面向问题编程"><meta property="article:tag" content="Kubernetes"><meta property="twitter:card" content="summary"><meta property="twitter:image" content="/img/practice-zuoyebang-k8s-1/0.jpg"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.heapoverflow.cn/pages/practice-zuoyebang-k8s-1/"},"headline":"作业帮 Kubernetes 原生调度器优化实践","image":["https://www.heapoverflow.cn/img/practice-zuoyebang-k8s-1/0.jpg"],"datePublished":"2022-04-04T12:06:09.095Z","dateModified":"2022-04-04T12:08:14.889Z","author":{"@type":"Person","name":"面向问题编程"},"publisher":{"@type":"Organization","name":"面向问题编程","logo":{"@type":"ImageObject","url":"https://www.heapoverflow.cn/img/logo.svg"}},"description":"吕亚霖，2019年加入作业帮，作业帮架构研发负责人，在作业帮期间主导了云原生架构演进、推动实施容器化改造、服务治理、GO微服务框架、DevOps的落地实践。 简介调度系统的本质是为计算服务&#x2F;任务匹配合适的资源，使其能够稳定高效地运行，以及在此的基础上进一步提高资源使用密度，而影响应用运行的因素非常多，比如 CPU、内存、IO、差异化的资源设备等等一系列因素都会影响应用运行的表现。同时，单"}</script><link rel="canonical" href="https://www.heapoverflow.cn/pages/practice-zuoyebang-k8s-1/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><script src="https://www.googletagmanager.com/gtag/js?id=G-ETGL163DQH" async></script><script>window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    
+        gtag('config', 'G-ETGL163DQH');</script><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><script data-ad-client="ca-pub-6757924689439593" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+          Array
+              .from(document.querySelectorAll('.tab-content'))
+              .forEach($tab => {
+                  $tab.classList.add('is-hidden');
+              });
+          Array
+              .from(document.querySelectorAll('.tabs li'))
+              .forEach($tab => {
+                  $tab.classList.remove('is-active');
+              });
+          const $activeTab = document.querySelector(location.hash);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+          const $tabMenu = document.querySelector(`a[href="${location.hash}"]`);
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 6.0.0"></head><body class="is-2-column"><nav class="navbar navbar-main"><div class="container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/categories/%E9%97%AE%E9%A2%98/">问题</a><a class="navbar-item" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/">技术架构</a><a class="navbar-item" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></div><div class="navbar-end"><a class="navbar-item" rel="noopener" title="分类" href="/categories">分类</a><a class="navbar-item" rel="noopener" title="标签" href="/tags">标签</a><a class="navbar-item" rel="noopener" title="归档" href="/archives">归档</a><a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;"><i class="fas fa-list-ul"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-9-widescreen"><div class="card"><div class="card-image"><span class="image is-7by3"><img class="fill" src="/img/practice-zuoyebang-k8s-1/0.jpg" alt="作业帮 Kubernetes 原生调度器优化实践"></span></div><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-04-04T12:06:09.095Z" title="2022/4/4 下午8:06:09">2022-04-04</time>发表</span><span class="level-item"><time dateTime="2022-04-04T12:08:14.889Z" title="2022/4/4 下午8:08:14">2022-04-04</time>更新</span><span class="level-item"><a class="link-muted" href="/categories/%E6%8A%80%E6%9C%AF%E5%AE%9E%E8%B7%B5/">技术实践</a></span><span class="level-item">19 分钟读完 (大约2860个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">作业帮 Kubernetes 原生调度器优化实践</h1><div class="content"><p>吕亚霖，2019年加入作业帮，作业帮架构研发负责人，在作业帮期间主导了云原生架构演进、推动实施容器化改造、服务治理、GO微服务框架、DevOps的落地实践。</p>
+<h2 id="简介"><a href="#简介" class="headerlink" title="简介"></a>简介</h2><p>调度系统的本质是为计算服务&#x2F;任务匹配合适的资源，使其能够稳定高效地运行，以及在此的基础上进一步提高资源使用密度，而影响应用运行的因素非常多，比如 CPU、内存、IO、差异化的资源设备等等一系列因素都会影响应用运行的表现。同时，单独和整体的资源请求、硬件&#x2F;软件&#x2F;策略限制、 亲和性要求、数据区域、负载间的干扰等因素以及周期性流量场景、计算密集场景、在离线混合等不同的应用场景的交织也带来了决策上的多变。</p>
+<span id="more"></span>
+
+<p><strong>调度器的目标则是快速准确地实现这一能力</strong>，但快速和准确这两个目标在资源有限的场景下会往往产生产生矛盾，需要在二者间权衡。</p>
+<h2 id="调度器原理和设计"><a href="#调度器原理和设计" class="headerlink" title="调度器原理和设计"></a>调度器原理和设计</h2><p><strong>K8s 默认调度器的整体工作框架</strong>，可以简单用下图概括：</p>
+<p><img src="/img/practice-zuoyebang-k8s-1/0.jpg"></p>
+<h3 id="两个控制循环"><a href="#两个控制循环" class="headerlink" title="两个控制循环"></a>两个控制循环</h3><ol>
+<li>第一个控制循环，称为 <strong>Informer Path</strong>。它的主要工作，是启动一系列的 Informer，用来监听（Watch）集群中 Pod、Node、Service 等与调度相关的 API 对象的变化。比如，当一个待调度 Pod 被创建出来之后，调度器就会通过 Pod Informer 的 Handler，将这个待调度 Pod 添加进调度队列；同时，调度器还要负责对调度器缓存 Scheduler Cache 进行更新，并以这个 cache 为参考信息，来提高整个调度流程的性能。</li>
+<li>第二个控制循环，即为<strong>对 pod 进行调度的主循环，称为 Scheduling Path</strong>。这一循环的工作流程是不断地从调度队列中取出待调度的 pod，运行2个步骤的算法，来选出最优 node。</li>
+</ol>
+<ul>
+<li>在集群的所有节点中，选出所有“可以”运行该 pod 的节点，这一步被称为 Predicates；</li>
+<li>在上一步选出的节点中，根据一些列优选算法对节点就行打分，选出“最优”即得分最高的节点，这一步被称为 Priorities。</li>
+</ul>
+<p>调度完成之后，调度器就会为 pod 的 spec.NodeName 赋值这个节点，这一步称为 Bind。而为了不在主流程路径中访问 Api Server 影响性能，调度器只会更新 Scheduler Cache 中的相关 pod 和 node 信息：这种基于乐观的假设的 Api 对象更新方式，在 K8s 中称为 Assume。之后才会创建一个 goroutine 来异步地向 Api Server 发起更新 Bind 操作，这一步就算失败了也没有关系，Scheduler Cache 更新后就会一切正常。</p>
+<h2 id="大规模集群调度带来的问题和挑战"><a href="#大规模集群调度带来的问题和挑战" class="headerlink" title="大规模集群调度带来的问题和挑战"></a>大规模集群调度带来的问题和挑战</h2><p>K8s 默认调度器策略在小规模集群下有着优异的表现，但是随着业务量级的增加以及业务种类的多样性变化，默认调度策略则逐渐显露出了局限性：调度维度较少，无并发，存在性能瓶颈，以及调度器越来越复杂。</p>
+<p>迄今为止，我们当前单个集群规模节点量千级，pod 量级则在 10w 以上，整体资源分配率超过60%，其中更是包含了 gpu，在离线混合部署等复杂场景；在这个过程中，我们遇到了不少调度方面的问题。</p>
+<h4 id="问题1：高峰期的节点负载不均匀"><a href="#问题1：高峰期的节点负载不均匀" class="headerlink" title="问题1：高峰期的节点负载不均匀"></a>问题1：高峰期的节点负载不均匀</h4><p>默认调度器，参考的是 workload 的 request 值，如果我们针对 request 设置的过高，会带来资源的浪费；过低则有可能带来高峰期 CPU 不均衡差异严重的情况；使用亲和策略虽然可以一定程度避免这种，但是需要频繁填充大量的策略，维护成本就会非常大。而且服务的 request 往往不能体现服务真实的负载，带来差异误差。而这种差异误差，会在高峰时体现到节点负载不均上。</p>
+<p>实时调度器，在调度的时候获取各节点实时数据来参与节点打分，但是实际上实时调度在很多场景并不适用，尤其是对于具备明显规律性的业务来说；比如我们大部分服务晚高峰流量是平时流量的几十倍，高低峰资源使用差距巨大，而业务发版一般选择低峰发版，采用实时调度器，往往发版的时候比较均衡，到晚高峰就出现节点间巨大差异，很多实时调度器，往往在出现巨大差异的时候会使用再平衡策略来重新调度，高峰时段对服务 POD 进行迁移，服务高可用角度来考虑是不现实的。显然实时调度是远远无法满足业务场景的。</p>
+<h4 id="我们的方案：高峰预测时调度"><a href="#我们的方案：高峰预测时调度" class="headerlink" title="我们的方案：高峰预测时调度"></a>我们的方案：高峰预测时调度</h4><p>所以针对这种情况，需要预测性调度，根据以往高峰时候 CPU、IO、网络、日志等资源的使用量，通过对服务在节点上进行最优排列组合回归测算，得到各个服务和资源的权重系数，基于资源的权重打分扩展，也就是使用过去高峰数据来预测未来高峰节点服务使用量，从而干预调度节点打分结果。</p>
+<h4 id="问题2：调度维度多样化"><a href="#问题2：调度维度多样化" class="headerlink" title="问题2：调度维度多样化"></a>问题2：调度维度多样化</h4><p>随着业务越来越多样性，需要加入更多的调度维度，比如日志。由于采集器不可能无限速率采集日志且日志采集是基于节点维度。需要将平衡日志采集速率，不能各个节点差异过大。部分服务 CPU 使用量一般但是日志输出量很大；而日志并不属于默认调度器决策的一环，所以当这些日志量很大的服务多个服务的 pod 在同一个节点上的时候，该机器上的日志上报就有可能出现部分延迟。</p>
+<h4 id="我们的方案：补全调度决策因子"><a href="#我们的方案：补全调度决策因子" class="headerlink" title="我们的方案：补全调度决策因子"></a>我们的方案：补全调度决策因子</h4><p>该问题显然需要我们对调度决策补全，我们扩展了预测调度打分策略，添加了日志的决策因子，将日志也作为节点的一种资源，并根据历史监控获取到服务对应的日志使用量来计算分数。</p>
+<h4 id="问题3：大批量服务扩缩带来的调度时延"><a href="#问题3：大批量服务扩缩带来的调度时延" class="headerlink" title="问题3：大批量服务扩缩带来的调度时延"></a>问题3：大批量服务扩缩带来的调度时延</h4><p>随着业务的复杂度进一步上升，在高峰时段出现，会有大量定时任务和集中大量弹性扩缩，大批量（上千 POD）同时调度导致调度时延的上涨，这两者对调度时间比较敏感，尤其对于定时任务来说，调度延时的上涨会被明显感知到。原因是 K8s 调度 pod 本身是对集群资源的分配，反应在调度流程上则是预选和打分阶段是顺序进行的；如此一来，当集群规模大到一定程度的时候，大批量更新就会出现可感知到的 pod 调度延迟。</p>
+<h4 id="我们的方案：拆分任务调度器，加大并发调度域、批量调度"><a href="#我们的方案：拆分任务调度器，加大并发调度域、批量调度" class="headerlink" title="我们的方案：拆分任务调度器，加大并发调度域、批量调度"></a>我们的方案：拆分任务调度器，加大并发调度域、批量调度</h4><p>解决吞吐能力低下的最直接的方法就是串行改并行，对于资源抢占场景，尽量细化资源域，资源域之间并行。给予以上策略，我们拆分出了独立的 job 调度器，同时使用了 serverless 作为 job 运行的底层资源。K8s serverless 为每一个 JOB POD，单独申请了独立的 POD 运行 sanbox，也就是任务调度器，是完整并行。<strong>以下对比图</strong>：</p>
+<p>原生调度器在晚高峰下节点 CPU 使用率</p>
+<p><img src="/img/practice-zuoyebang-k8s-1/1.jpg"></p>
+<p>优化后调度器在晚高峰下节点 CPU 使用率</p>
+<p><img src="/img/practice-zuoyebang-k8s-1/2.jpg"></p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p><strong>work 节点资源、GPU 资源、serverless 资源这就是我们集群异构资源分属于这三类资源域</strong>，这三种资源上运行的服务存在天然的差异性，我们使用 forecast-scheduler、gpu-scheduler、job-schedule 三个调度器来管理这三种资源域上的 pod 的调度情况。</p>
+<p>预测调度器管理大部分在线业务，其中扩展了资源维度，添加了预测打分策略。</p>
+<p>GPU 调度器管理 GPU 资源机器的分配，运行在线推理和离线训练，两者的比例处于长期波动中，高峰期间离线训练缩容、在线推理扩容；非高峰期间离线训练扩容、在线推理缩容；同时处理一些离线图片处理任务来复用 GPU 机器上比较空闲的 CPU 等资源。</p>
+<p>Job 调度器负责管理我们定时任务的调度，定时任务量大且创建销毁频繁，资源使用非常碎片化，而且对实效性要求更高；所以我们将任务尽量调度到 Serverless 服务上，压缩集群中为了能容纳大量的任务而冗余的机器资源，提升资源利用率。</p>
+<p><img src="/img/practice-zuoyebang-k8s-1/3.jpg"></p>
+<h2 id="未来的演进探讨"><a href="#未来的演进探讨" class="headerlink" title="未来的演进探讨"></a>未来的演进探讨</h2><h3 id="更细粒度的资源域划分"><a href="#更细粒度的资源域划分" class="headerlink" title="更细粒度的资源域划分"></a>更细粒度的资源域划分</h3><p>将资源域划分至节点级别，节点级别加锁来进行。</p>
+<h3 id="资源抢占和重调度"><a href="#资源抢占和重调度" class="headerlink" title="资源抢占和重调度"></a>资源抢占和重调度</h3><p>正常场景下，当一个 pod 调度失败的时候，这个 pod 会保持在 pending 的状态，等待 pod 更新或者集群资源发生变化进行重新调度，但是 K8s 调度器依然存在一个抢占功能，可以使得高优先级 pod 在调度失败的时候，挤走某个节点上的部分低优先级 pod 以保证高优 pod 的正常，迄今为止我们并没有使用调度器的抢占能力，即使我们通过以上多种策略来加强调度的准确性，但依然无法避免部分场景下由于业务带来的不均衡情况，这种非正常场景中，重调度的能力就有了用武之地，也许重调度将会成为日后针对异常场景的一种自动修复的方式。</p>
+<article class="message message-immersive is-primary">
+<div class="message-body">
+<i class="fas fa-globe-asia mr-2"></i>本文来自
+<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/tQEbfumBkR2GW5YU3L_iRQ">腾讯云原生</a>.
+</div>
+</article>
+    </div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/Kubernetes/">Kubernetes</a></div><!--!--><div><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6757924689439593" crossOrigin="anonymous"></script><ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-6757924689439593" data-ad-slot="2352785969"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div></article></div><!--!--><nav class="post-navigation mt-4 level is-mobile"><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/pages/practice-iqiyi-k8s-1/"><span class="level-item">爱奇艺视频生产 Kubernetes 集群优化实践：感知业务优先级</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--><div style="width:100%"><script src="https://giscus.app/client.js" data-repo="thetechstack/thetechstack.github.io" data-repo-id="R_kgDOG6Ti1Q" data-category="Announcements" data-category-id="DIC_kwDOG6Ti1c4COQtm" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light" data-lang="zh-CN" crossOrigin="anonymous" async></script></div></div><!--!--><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen  order-3 is-sticky"><div class="card widget" id="toc" data-type="toc"><div class="card-content"><div class="menu"><h3 class="menu-label">目录</h3><ul class="menu-list"><li><a class="level is-mobile" href="#简介"><span class="level-left"><span class="level-item">1</span><span class="level-item">简介</span></span></a></li><li><a class="level is-mobile" href="#调度器原理和设计"><span class="level-left"><span class="level-item">2</span><span class="level-item">调度器原理和设计</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#两个控制循环"><span class="level-left"><span class="level-item">2.1</span><span class="level-item">两个控制循环</span></span></a></li></ul></li><li><a class="level is-mobile" href="#大规模集群调度带来的问题和挑战"><span class="level-left"><span class="level-item">3</span><span class="level-item">大规模集群调度带来的问题和挑战</span></span></a><ul class="menu-list"><ul class="menu-list"><li><a class="level is-mobile" href="#问题1：高峰期的节点负载不均匀"><span class="level-left"><span class="level-item">3.1.1</span><span class="level-item">问题1：高峰期的节点负载不均匀</span></span></a></li><li><a class="level is-mobile" href="#我们的方案：高峰预测时调度"><span class="level-left"><span class="level-item">3.1.2</span><span class="level-item">我们的方案：高峰预测时调度</span></span></a></li><li><a class="level is-mobile" href="#问题2：调度维度多样化"><span class="level-left"><span class="level-item">3.1.3</span><span class="level-item">问题2：调度维度多样化</span></span></a></li><li><a class="level is-mobile" href="#我们的方案：补全调度决策因子"><span class="level-left"><span class="level-item">3.1.4</span><span class="level-item">我们的方案：补全调度决策因子</span></span></a></li><li><a class="level is-mobile" href="#问题3：大批量服务扩缩带来的调度时延"><span class="level-left"><span class="level-item">3.1.5</span><span class="level-item">问题3：大批量服务扩缩带来的调度时延</span></span></a></li><li><a class="level is-mobile" href="#我们的方案：拆分任务调度器，加大并发调度域、批量调度"><span class="level-left"><span class="level-item">3.1.6</span><span class="level-item">我们的方案：拆分任务调度器，加大并发调度域、批量调度</span></span></a></li></ul></ul></li><li><a class="level is-mobile" href="#总结"><span class="level-left"><span class="level-item">4</span><span class="level-item">总结</span></span></a></li><li><a class="level is-mobile" href="#未来的演进探讨"><span class="level-left"><span class="level-item">5</span><span class="level-item">未来的演进探讨</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#更细粒度的资源域划分"><span class="level-left"><span class="level-item">5.1</span><span class="level-item">更细粒度的资源域划分</span></span></a></li><li><a class="level is-mobile" href="#资源抢占和重调度"><span class="level-left"><span class="level-item">5.2</span><span class="level-item">资源抢占和重调度</span></span></a></li></ul></li></ul></div></div><style>#toc .menu-list > li > a.is-active + .menu-list { display: block; }#toc .menu-list > li > a + .menu-list { display: none; }</style><script src="/js/toc.js" defer></script></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/Feed%E6%9C%8D%E5%8A%A1/"><span class="tag">Feed服务</span><span class="tag">3</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Knative/"><span class="tag">Knative</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Kubernetes/"><span class="tag">Kubernetes</span><span class="tag">21</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Linux%E7%BD%91%E7%BB%9C/"><span class="tag">Linux网络</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Serverless/"><span class="tag">Serverless</span><span class="tag">5</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Yarn/"><span class="tag">Yarn</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E4%B8%80%E8%87%B4%E6%80%A7/"><span class="tag">分布式一致性</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%9C%A8%E7%A6%BB%E7%BA%BF%E6%B7%B7%E9%83%A8/"><span class="tag">在离线混部</span><span class="tag">4</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/"><span class="tag">大数据</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%99%BA%E8%83%BD%E8%BF%90%E7%BB%B4/"><span class="tag">智能运维</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E8%99%9A%E6%8B%9F%E5%8C%96/"><span class="tag">网络虚拟化</span><span class="tag">3</span></a></div></div></div></div></div><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg"></figure><p class="is-size-6 is-block">公众号：面向问题编程</p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives"><p class="title">50</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories"><p class="title">5</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags"><p class="title">11</p></a></div></div></nav></div></div><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/"><span class="level-start"><span class="level-item">一文了解</span></span><span class="level-end"><span class="level-item tag">23</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E5%AE%9E%E8%B7%B5/"><span class="level-start"><span class="level-item">技术实践</span></span><span class="level-end"><span class="level-item tag">6</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/"><span class="level-start"><span class="level-item">技术架构</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BB%BC%E8%BF%B0/"><span class="level-start"><span class="level-item">综述</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E9%97%AE%E9%A2%98/"><span class="level-start"><span class="level-item">问题</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li></ul></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a><p class="is-size-7"><span>&copy; 2022 面向问题编程</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-CN");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/lg-zoom@1.3.0/dist/lg-zoom.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script type="text/x-mathjax-config">MathJax.Hub.Config({
+            'HTML-CSS': {
+                matchFontHeight: false
+            },
+            SVG: {
+                matchFontHeight: false
+            },
+            CommonHTML: {
+                matchFontHeight: false
+            },
+            tex2jax: {
+                inlineMath: [
+                    ['$','$'],
+                    ['\\(','\\)']
+                ]
+            }
+        });</script><script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.9/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script><!--!--><!--!--><!--!--><script src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script src="/js/insight.js" defer></script><script>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script></body></html>

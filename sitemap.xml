@@ -2,6 +2,24 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <url>
+    <loc>https://www.heapoverflow.cn/pages/practice-zuoyebang-k8s-1/</loc>
+    
+    <lastmod>2022-04-04</lastmod>
+    
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <url>
+    <loc>https://www.heapoverflow.cn/pages/practice-iqiyi-k8s-1/</loc>
+    
+    <lastmod>2022-04-04</lastmod>
+    
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <url>
     <loc>https://www.heapoverflow.cn/pages/practice-meitun-k8s-3/</loc>
     
     <lastmod>2022-04-04</lastmod>
@@ -452,6 +470,13 @@
 
   
   <url>
+    <loc>https://www.heapoverflow.cn/tags/Yarn/</loc>
+    <lastmod>2022-04-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.2</priority>
+  </url>
+  
+  <url>
     <loc>https://www.heapoverflow.cn/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/</loc>
     <lastmod>2022-04-04</lastmod>
     <changefreq>weekly</changefreq>
@@ -460,13 +485,6 @@
   
   <url>
     <loc>https://www.heapoverflow.cn/tags/Serverless/</loc>
-    <lastmod>2022-04-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.2</priority>
-  </url>
-  
-  <url>
-    <loc>https://www.heapoverflow.cn/tags/Yarn/</loc>
     <lastmod>2022-04-04</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.2</priority>
