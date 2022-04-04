@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><title>腾讯云私有化容器平台之网络 - 面向问题编程</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="面向问题编程"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="面向问题编程"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="刚开始接触容器集群的人会发现，与在单节点上使用容器相比，容器集群一个很复杂的领域就是网络。Kubernetes 作为容器编排领域的事实标准，对容器集群的网络进行了合理抽象，并开放了容器网络标准 CNI，供各公司根据自身应用场景和底层基础设施选用开源方案或者自行实现一套网络插件。本文主要介绍腾讯云容器平台针对私有化不同场景的一些网络方案实践。"><meta property="og:type" content="blog"><meta property="og:title" content="腾讯云私有化容器平台之网络"><meta property="og:url" content="https://www.heapoverflow.cn/pages/practice-tx-k8s-1/"><meta property="og:site_name" content="面向问题编程"><meta property="og:description" content="刚开始接触容器集群的人会发现，与在单节点上使用容器相比，容器集群一个很复杂的领域就是网络。Kubernetes 作为容器编排领域的事实标准，对容器集群的网络进行了合理抽象，并开放了容器网络标准 CNI，供各公司根据自身应用场景和底层基础设施选用开源方案或者自行实现一套网络插件。本文主要介绍腾讯云容器平台针对私有化不同场景的一些网络方案实践。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://www.heapoverflow.cn/img/practice-tx-k8s-1/4.jpg"><meta property="article:published_time" content="2022-04-04T14:11:15.577Z"><meta property="article:modified_time" content="2022-04-04T14:16:06.168Z"><meta property="article:author" content="面向问题编程"><meta property="article:tag" content="Kubernetes"><meta property="twitter:card" content="summary"><meta property="twitter:image" content="/img/practice-tx-k8s-1/4.jpg"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.heapoverflow.cn/pages/practice-tx-k8s-1/"},"headline":"腾讯云私有化容器平台之网络","image":["https://www.heapoverflow.cn/img/practice-tx-k8s-1/4.jpg"],"datePublished":"2022-04-04T14:11:15.577Z","dateModified":"2022-04-04T14:16:06.168Z","author":{"@type":"Person","name":"面向问题编程"},"publisher":{"@type":"Organization","name":"面向问题编程","logo":{"@type":"ImageObject","url":"https://www.heapoverflow.cn/img/logo.svg"}},"description":"刚开始接触容器集群的人会发现，与在单节点上使用容器相比，容器集群一个很复杂的领域就是网络。Kubernetes 作为容器编排领域的事实标准，对容器集群的网络进行了合理抽象，并开放了容器网络标准 CNI，供各公司根据自身应用场景和底层基础设施选用开源方案或者自行实现一套网络插件。本文主要介绍腾讯云容器平台针对私有化不同场景的一些网络方案实践。"}</script><link rel="canonical" href="https://www.heapoverflow.cn/pages/practice-tx-k8s-1/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><script src="https://www.googletagmanager.com/gtag/js?id=G-ETGL163DQH" async></script><script>window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    
+        gtag('config', 'G-ETGL163DQH');</script><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><script data-ad-client="ca-pub-6757924689439593" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+          Array
+              .from(document.querySelectorAll('.tab-content'))
+              .forEach($tab => {
+                  $tab.classList.add('is-hidden');
+              });
+          Array
+              .from(document.querySelectorAll('.tabs li'))
+              .forEach($tab => {
+                  $tab.classList.remove('is-active');
+              });
+          const $activeTab = document.querySelector(location.hash);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+          const $tabMenu = document.querySelector(`a[href="${location.hash}"]`);
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 6.0.0"></head><body class="is-2-column"><nav class="navbar navbar-main"><div class="container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/categories/%E9%97%AE%E9%A2%98/">问题</a><a class="navbar-item" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/">技术架构</a><a class="navbar-item" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></div><div class="navbar-end"><a class="navbar-item" rel="noopener" title="分类" href="/categories">分类</a><a class="navbar-item" rel="noopener" title="标签" href="/tags">标签</a><a class="navbar-item" rel="noopener" title="归档" href="/archives">归档</a><a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;"><i class="fas fa-list-ul"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-9-widescreen"><div class="card"><div class="card-image"><span class="image is-7by3"><img class="fill" src="/img/practice-tx-k8s-1/4.jpg" alt="腾讯云私有化容器平台之网络"></span></div><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-04-04T14:11:15.577Z" title="2022/4/4 下午10:11:15">2022-04-04</time>发表</span><span class="level-item"><time dateTime="2022-04-04T14:16:06.168Z" title="2022/4/4 下午10:16:06">2022-04-04</time>更新</span><span class="level-item"><a class="link-muted" href="/categories/%E6%8A%80%E6%9C%AF%E5%AE%9E%E8%B7%B5/">技术实践</a></span><span class="level-item">31 分钟读完 (大约4610个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">腾讯云私有化容器平台之网络</h1><div class="content"><p>刚开始接触容器集群的人会发现，与在单节点上使用容器相比，容器集群一个很复杂的领域就是网络。Kubernetes 作为容器编排领域的事实标准，对容器集群的网络进行了合理抽象，并开放了容器网络标准 CNI，供各公司根据自身应用场景和底层基础设施选用开源方案或者自行实现一套网络插件。本文主要介绍腾讯云容器平台针对私有化不同场景的一些网络方案实践。</p>
+<span id="more"></span>
+
+<h2 id="Kubernetes网络架构"><a href="#Kubernetes网络架构" class="headerlink" title="Kubernetes网络架构"></a>Kubernetes网络架构</h2><p>Kubernetes 没有提供网络模型供用户直接使用，而是开放了容器网络标准CNI。CNI 的目标是用户可以不再需要额外考虑如何建立 Pod 之间的连接，它规定所有 Pod 都必须在一个可以直接连通的扁平网络空间中，并且每个 Pod 都要有自己独立的 IP。对此，Kubernetes 对容器网络做出了如下要求：</p>
+<p>1）所有容器都可以在不用 NAT 方式的情况下和其他的容器通信。</p>
+<p>2）所有节点都可以在不用 NAT 方式的情况下和其他的容器通信。</p>
+<p>3）容器自己看的地址和别人看到的地址是同一个地址。</p>
+<p>针对上述的网络要求，Kubernetes 设计了 Pod-Workload-Service-Ingress 这样的服务发现机制。并且业界实现 CNI 网络标准也开源了很多企业级网络解决方案，比如 Flannel 和 Calico。这些不同的方案有不同的应用场景和要求，要根据实际需要进行选择。</p>
+<p>综合来说所有的网络方案可以分为 Overlay 和 Underlay 两大类，其中 Overlay 网络在原始3层网络的基础上又封装了一层虚拟的网络，使得网络包可以在 K8S 集群的不同节点中传递，这种方案不依赖于宿主机底层网络架构，用户只需要了解基本的网络知识就可以方便地进行使用。不过这种方案一个明显的缺点是性能较差，因为在原有网络的基础上叠加了一层 Overlay 网络，封包解包或者NAT 对网络性能都有一定损耗。</p>
+<p>Underlay 网络是二层或三层的网络方案。Calico 就是一个纯三层的网络方案，它通过在 K8S 集群中使用 BGP 路由协议在不同节点中来分发各个 Pod互联的路由信息，使得Pod在整个集群中进行通信。Underlay 网络没有解包封包和 NAT 的过程，性能很好。但是受宿主机网络架构的制约,不是所有场景都可以使用 Underlay 网络，比如 Calico 就需要手动配置路由、交换机需要支持BGP 协议等，而且它的上手成本较高。</p>
+<h2 id="Kubernetes网络局限性"><a href="#Kubernetes网络局限性" class="headerlink" title="Kubernetes网络局限性"></a>Kubernetes网络局限性</h2><p>尽管 Kubernetes 提出了 Service 和 Ingress 等网络概念，业界也开源了很多 CNI 网络插件，但是在实际应用中很多人还是会感觉到 Kubernetes 的网络功能比较匮乏，使用也不够灵活。其网络方案经常受到一些公司传统业务部门的挑战，例如 Pod 网络无法被外部服务直接访问、有状态应用希望保持 Pod IP固定、外部服务通过 Ingress 或 Nodeport 访问 Pod 丢失源 IP 等等。</p>
+<p>上述问题造成的结果是业务方在容器化过程中会产生很多顾虑，要上容器只能放弃基于 IP 的服务访问方式，并割舍掉一些原有的网络功能。我们希望可以通过一个功能更全面的网络插件来丰富 Kubernetes 现有的能力，协助业务方更顺利地落地容器。</p>
+<h2 id="腾讯云私有化容器平台自研网络方案"><a href="#腾讯云私有化容器平台自研网络方案" class="headerlink" title="腾讯云私有化容器平台自研网络方案"></a>腾讯云私有化容器平台自研网络方案</h2><p>腾讯云私有化容器平台有 Tencent Cloud Enterprise (TCE) 和 Tencent Cloud Enterprise (TKE)  两个版本。</p>
+<p>TCE 是基于腾讯公有云成熟产品体系推出的专有云解决方案，采用Kubernetes on Kubernetes 架构，支持私有化输出，提供计算、存储、网络、负载均衡、中间件等全套产品能力。其容器服务使用的网络是基于私有网络 VPC 自研的 Global-Route 插件以及 VPC-CNI 插件。</p>
+<p>TKE 是腾讯云专门为企业打造的高性能私有云容器平台，基于原生 Kubernetes 提供高度可扩展的高性能容器管理服务。没有 TCE 上的 VPC 等概念，而是直接在业务方 IASS 环境中部署集群，支持自行选择 Overlay 或 Underlay 网络，其使用的网络方案由 Galaxy 插件进行支持。</p>
+<p>下面分别介绍这两个平台不同网络方案的技术原理和应用场景。</p>
+<h3 id="TCE：Global-Route-插件"><a href="#TCE：Global-Route-插件" class="headerlink" title="TCE：Global-Route 插件"></a><strong>TCE：Global-Route 插件</strong></h3><p>Global-Route（全局路由）模式是 TCE 默认采用的网络方案，该模式依托于 VPC 底层路由能力，不需要在节点上配置 Vxlan 等 Overlay 设备，就可以实现容器网络和 VPC 网络的互访。</p>
+<p><img src="/img/practice-tx-k8s-1/3.jpg"></p>
+<p>节点跨母机场景下， Pod1 数据包会先经过默认路由转发到 Node1 eth0 网卡，随后 Node1 会将数据包转发到母机1 br，母机1查询全局路由表项依据 RemoteIP 封装 gre 头，并将目标节点 IP 填入 gre option，再经由母机1 eth1 发出。母机2 eth1收到数据包后会解封 gre 包头，并从 gre option 获取节点IP，于是将数据包转给Node2 eth0，最终送至 Pod2。最终再由 Pod2 处理回包，回包链路和发包链路对称。</p>
+<p>节点不跨母机场景下，Pod 互访数据链路相同，经由母机 eth1 发出后，又由 eth1 收到，解封 gre 报文，转发给 br，最终转发给 pod。</p>
+<p>这种模式同时是腾讯云公有云容器服务TKE的默认网络方案，支持集群内容器与容器之间互通，集群内容器与节点互通，集群内容器与云数据库、云存储等资源同一 VPC 下内网互通，容器集群与 IDC 互通，TCE 容器集群与公有云 TKE 容器集群互通。</p>
+<h3 id="TCE-VPC-CNI-插件"><a href="#TCE-VPC-CNI-插件" class="headerlink" title="TCE : VPC-CNI 插件"></a><strong>TCE : VPC-CNI 插件</strong></h3><p><img src="/img/practice-tx-k8s-1/4.jpg"></p>
+<p>VPC-CNI 网络利用腾讯云的多弹性网卡能力，为集群内的 Pod 分配 VPC 内的 IP 地址，由 VPC 负责路由，可实现 Pod 和 Node 的控制面和数据面完全在同一网络层面。针对每一个节点，如果该节点和容器子网处于同一个可用区，我们会为该节点额外创建一块弹性网卡。当 Pod 调度到节点上，Pod 请求 IP 时，辅助 IP 才会绑定到节点的辅助弹性网卡，IP 不会预先分配。</p>
+<p><img src="/img/practice-tx-k8s-1/5.jpg"></p>
+<p>并且 VPC-CNI 网络支持通过 IPAMD 插件固定 StatefulSet 类型 Pod 的 IP，当有 Statefulset 新建&#x2F;更新&#x2F;删除时，IPAMD 插件会监听到该事件，为 Statefulset 预留&#x2F;解预留 IP，适用于需要对 IP 来源做访问限制、通过 IP 查询日志等场景。</p>
+<p>一般来说，如果你希望支持 StatefulSet 类型 Pod IP 固定功能，并打算将容器集群与 TCE 提供的存储、负载均衡等成熟模块打通，那么就可以选择使用基于 VPC-CNI 插件的 TCE 版容器服务。</p>
+<h3 id="TKE-Galaxy插件"><a href="#TKE-Galaxy插件" class="headerlink" title="TKE : Galaxy插件"></a><strong>TKE : Galaxy插件</strong></h3><p>针对用户的不同应用场景，腾讯 Gaia 团队自研的 Galaxy CNI 插件实现了 Overlay、Floating-IP、NAT、Host 四种网络解决方案，可以动态地为容器配置 Underlay&#x2F;Overlay 网络以及端口映射。</p>
+<h3 id="Overlay"><a href="#Overlay" class="headerlink" title="Overlay"></a><strong>Overlay</strong></h3><p><img src="/img/practice-tx-k8s-1/6.jpg"></p>
+<p>Flannel 作为 Overlay 网络的代表，可能是目前应用最广泛也最受欢迎的CNI 插件。它通过 Kubernetes 集群的 etcd 服务存储节点和网段之间的映射关系，Pod 只能在所在节点的网段中分配 IP 地址，保证了 Pod IP 的唯一性。在做跨节点通信时，Flannel 默认使用 Vxlan 协议将额外的节点信息添加为包头进行传输，但是这种传输方式一直在解包封包，性能损失较大。</p>
+<p>而 Flannel 的 Host-Gateway 模式则通过每个节点上的 Agent 进程配置容器网络的路由信息，只要是在同一个二层网络中，数据就可以直接通过主机的路由表进行转发，相较于前面一直解包封包提升了性能。但是当数据传输需要跨三层路由器时，单单配置主机路由表是不能解决问题的。</p>
+<p><img src="/img/practice-tx-k8s-1/7.jpg"></p>
+<p>区别于 Flannel 的 Host-Gateway 模式只能修改主机路由表，Calico 则是模拟了三层路由器，通过 vRouter 在主机配置 BGP 路由协议将节点的路由信息广播到整个集群的其他路由设备中，从而实现了无解包封包的跨网段数据转发能力。当网络不支持 BGP 协议时，Calico 使用 IPIP 协议来封包传输数据， IPIP 即将原 Pod IP 的数据包添加 Host IP和 Host Mac 作为包头，因为 IPIP 包头较小，相较于 VxLAN 速度更快。</p>
+<p>腾讯自研的 Overlay 网络汲取了 Flannel&#x2F;Calico 容器网络开源项目的优点，实现了基于 IPIP 和 Host Gateway 的 Overlay 网络方案。最终达到如下效果：</p>
+<p>◆ 同节点容器报文无桥接，利用主机路由表进行转发，避免跨主机容器访问时 bridge 的二层端口查询</p>
+<p>◆ 同网段节点容器报文无封包，利用主机路由表进行转发，无封包解包方案的性能最优</p>
+<p>◆ 跨网段节点容器数据利用 IPIP 协议封包， IPIP 性能好于 vxlan。</p>
+<p><img src="/img/practice-tx-k8s-1/8.jpg"></p>
+<p>经过测试，Vxlan比HOST差33%，IPIP 比HOST差23%，Gateway比HOST只差6%，目前该方案已被 Flannel 社区合并：</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/coreos/flannel/pull/842coreos/flannel#842">https://github.com/coreos/flannel/pull/842coreos/flannel#842</a></p>
+<p>总的来说，Overlay 网络适用于对网络性能没有特殊要求、并且只使用Kubernetes 原生网络能力，不需要额外支持 Pod IP 对外暴露、Pod IP 固定等功能的场景。它是大多数用户的不错选择，通过腾讯云 TKE 创建的私有云Kubernetes 集群默认采用该方案。</p>
+<h3 id="Floating-IP"><a href="#Floating-IP" class="headerlink" title="Floating-IP"></a><strong>Floating-IP</strong></h3><h4 id="Floating-IP-介绍"><a href="#Floating-IP-介绍" class="headerlink" title="Floating-IP 介绍"></a><strong>Floating-IP 介绍</strong></h4><p>在很多场景下业务方希望容器、物理机和虚拟机可以在同一个扁平面中直接通过IP进行通信，由此我们实现了 Floating-IP 网络。</p>
+<p>Floating-IP 模式将宿主机网络同一网段的IP直接配置到容器中，有别于Openstack（将 FloatingIP 配置到宿主机的网络空间再通过 NAT 转发）的实现，其性能更好，容器与物理机可以直接路由。</p>
+<p>这种模式为了保证容器与宿主机的交换机二层连通，需要在物理机上搭一个 vbridge&#x2F;vswitch 虚拟网桥，我们目前支持 Linux bridge、MacVlan、SRIOV 三种模式，用户可以根据业务场景和硬件环境，具体选择使用哪种网桥。</p>
+<p>◆ Bridge：Bridge 设备内核是 Linux 最早实现的网桥，它跟虚拟机桥接模式原理一样，可以应用到所有的场景。</p>
+<p><img src="/img/practice-tx-k8s-1/9.jpg"></p>
+<p>◆ MacVlan：MacVlan 和 Bridge 比较相似，其相比 bridge 没有源地址学习功能，不支持 STP，可以利用网卡的 unicast filter 功能，因此拥有更好的性能。但是 MacVlan 的问题是，为了隔离需要内核实现时不允许 MacVlan 容器访问其宿主机的 IP，也无法访问容器所在宿主机上配置的 Service Cluster IP和 NodePort，但是可以通过访问其他宿主机的 NodePort来规避这个问题。</p>
+<p><img src="/img/practice-tx-k8s-1/10.jpg"></p>
+<p>◆ SRIOV：SRIOV是网卡硬件功能，可以将一个物理网卡虚拟成多个物理网卡设备。SR-IOV 引入了 PFs(physical functions)和 VFs(virtual functions)的概念，每个VF都可以看做是一个独立的物理网卡( PCIe 设备)可以被容器或虚拟机直接访问，较 Linux 软件交换机其性能更好，且消耗 CPU 更少。</p>
+<h4 id="Floating-IP-IP漂移能力"><a href="#Floating-IP-IP漂移能力" class="headerlink" title="Floating-IP IP漂移能力"></a><strong>Floating-IP IP漂移能力</strong></h4><p>在 Kubernetes 中，Pod 会不断地销毁重建，这就导致 Pod IP 一直在改变。但是很多场景都需要 Pod 支持 IP 固定。比如，集群外部存量业务基于 IP进行服务发现、基于 Pod IP 进行白名单认证，支持有状态服务 Statefulset等。对此 Floating-IP 模式提供了 IP 漂移能力，支持 Pod 重启或迁移时 IP 不变。</p>
+<p>但是这个特性实现起来有一些问题需要考虑：</p>
+<p>1) 在发生 Pod 迁移时，如果IP可迁移范围内没有备份机器或者备份机器的剩余CPU&#x2F;内存无法满足 Pod 需求，Pod 将长时间无法被调度</p>
+<p>2) 微服务（Deployment）的 Pod 发生迁移时，Pod 实际是先被删除，然后replicaset创建新的 Pod，新老 Pod 名称不相同，无法关联到之前的 IP</p>
+<p>3) Pod 发生迁移时，如何限制其可调度范围</p>
+<p>针对第一个问题，我们将这个特性做成了可选的，在提交 App 时由用户决定是否需要开启IP漂移功能。</p>
+<p>针对第二个问题，我们保证微服务的 Pod 发生迁移后微服务整体 IP 不变，通用服务 TAPP（后续文章会介绍），Pod 迁移后由于名称不变，所以每个实例分配的IP不变。</p>
+<p>针对最后一个问题，必须要在调度时考虑使用 FloatingIP 的 Pod 的迁移范围，所以我们实现了 kube-scheduler 的一个调度插件 FloatingIP Plugin。FloatingIP Plugin会watch Replicaset&#x2F;TApp的缩容和删除操作，释放IP，也会定时校对已分配的IP是否还有对应的Pod，防止scheduler重启期间的事件丢失。</p>
+<p>对于那些想要使用 Underlay 网络的人来说 Floating-IP 模式是一个很好的选择。它支持 Pod IP 对外暴露和 Pod IP 固定功能，基于这两个特性可以很好地支持存量业务升级、集群内外服务IP互访的场景。但是使用 Floating-IP 模式需要单独提供 IP 资源，对于 IP 资源不足的场景则无法使用。</p>
+<h3 id="NAT"><a href="#NAT" class="headerlink" title="NAT"></a><strong>NAT</strong></h3><p>如果业务方想要在集群外访问一个应用的所有容器实例，而IP资源又不够用，这时可以选用 Galaxy 插件的 NAT 模式。虽然我们可以通过给应用创建多个 Nodeport 来将这些 Pod 对外暴露，但是 Kubernetes 原生 Service 的Nodeport 模式端口范围有限制（30000-32767），并且不管是否运行指定应用的容器，所有节点都需要开放多个相同端口。当这类应用数目很多时，可能会导致集群节点端口不够用并丢失。</p>
+<p>Galaxy 插件的 NAT 网络与 Docker 的 NAT 网络很像，都是通过配置iptables 规则来实现。Galaxy插件取消了端口范围的限制，并且给每个实例配置容器到主机的随机端口映射。</p>
+<p><img src="/img/practice-tx-k8s-1/11.jpg"></p>
+<p>外部数据包访问容器时会先访问宿主机网卡端口，通过 DNAT 数据包的目标地址修改为容器 IP，最终将数据包送至容器；</p>
+<p><img src="/img/practice-tx-k8s-1/12.jpg"></p>
+<p>容器发送数据包也会先访问宿主机，通过 SNAT 修改数据包源地址为宿主机 IP 。不过不同于 Docker 的 NAT 网络，Galaxy 插件分给容器的是 Overlay 的 IP，应用容器通过环境变量获取宿主机的IP和随机端口。</p>
+<h3 id="Host"><a href="#Host" class="headerlink" title="Host"></a><strong>Host</strong></h3><p>Host 模式下容器直接与宿主机共享网络，没有进行虚拟化网络隔离。这样一来，Pod 中所有的容器都直接暴露在宿主机网络环境中。它最大的好处是性能高、延迟低，但是需要处理宿主机端口冲突问题，并且也有安全隐患。Kubernetes 原生支持这种网络方案，所以 Galaxy 插件也支持了这种方式。</p>
+<p>如果对你的环境而言，网络性能是非常重要的一点。并且你能够处理主机端口的映射关系和占用问题，那么这种方式仍然有其使用价值。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a><strong>总结</strong></h2><p>不同企业之间的网络架构千差万别，本文主要介绍了 Kubernetes 的网络架构设计以及腾讯基于多年深耕私有云 PASS 平台经验自研的 VPC-CNI 插件、GLobal-Route插件和 Galaxy 插件，这三个网络插件针对不同应用场景拥有多种解决方案，可以在满足业务方独特需求的前提下，提供给业务方一致的使用体验，降低服务容器化成本，进而享受容器技术带来的轻量、灵活、一致性使用体验。</p>
+<article class="message message-immersive is-primary">
+<div class="message-body">
+<i class="fas fa-globe-asia mr-2"></i>本文来自
+<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/Ykb-So-EVj8rNE6HZg7XTQ">腾讯云原生</a>.
+</div>
+</article>
+    </div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/Kubernetes/">Kubernetes</a></div><!--!--><div><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6757924689439593" crossOrigin="anonymous"></script><ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-6757924689439593" data-ad-slot="2352785969"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div></article></div><!--!--><nav class="post-navigation mt-4 level is-mobile"><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/pages/practice-zuoyebang-k8s-1/"><span class="level-item">作业帮 Kubernetes 原生调度器优化实践</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--><div style="width:100%"><script src="https://giscus.app/client.js" data-repo="thetechstack/thetechstack.github.io" data-repo-id="R_kgDOG6Ti1Q" data-category="Announcements" data-category-id="DIC_kwDOG6Ti1c4COQtm" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light" data-lang="zh-CN" crossOrigin="anonymous" async></script></div></div><!--!--><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen  order-3 is-sticky"><div class="card widget" id="toc" data-type="toc"><div class="card-content"><div class="menu"><h3 class="menu-label">目录</h3><ul class="menu-list"><li><a class="level is-mobile" href="#Kubernetes网络架构"><span class="level-left"><span class="level-item">1</span><span class="level-item">Kubernetes网络架构</span></span></a></li><li><a class="level is-mobile" href="#Kubernetes网络局限性"><span class="level-left"><span class="level-item">2</span><span class="level-item">Kubernetes网络局限性</span></span></a></li><li><a class="level is-mobile" href="#腾讯云私有化容器平台自研网络方案"><span class="level-left"><span class="level-item">3</span><span class="level-item">腾讯云私有化容器平台自研网络方案</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#TCE：Global-Route-插件"><span class="level-left"><span class="level-item">3.1</span><span class="level-item">TCE：Global-Route 插件</span></span></a></li><li><a class="level is-mobile" href="#TCE-VPC-CNI-插件"><span class="level-left"><span class="level-item">3.2</span><span class="level-item">TCE : VPC-CNI 插件</span></span></a></li><li><a class="level is-mobile" href="#TKE-Galaxy插件"><span class="level-left"><span class="level-item">3.3</span><span class="level-item">TKE : Galaxy插件</span></span></a></li><li><a class="level is-mobile" href="#Overlay"><span class="level-left"><span class="level-item">3.4</span><span class="level-item">Overlay</span></span></a></li><li><a class="level is-mobile" href="#Floating-IP"><span class="level-left"><span class="level-item">3.5</span><span class="level-item">Floating-IP</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#Floating-IP-介绍"><span class="level-left"><span class="level-item">3.5.1</span><span class="level-item">Floating-IP 介绍</span></span></a></li><li><a class="level is-mobile" href="#Floating-IP-IP漂移能力"><span class="level-left"><span class="level-item">3.5.2</span><span class="level-item">Floating-IP IP漂移能力</span></span></a></li></ul></li><li><a class="level is-mobile" href="#NAT"><span class="level-left"><span class="level-item">3.6</span><span class="level-item">NAT</span></span></a></li><li><a class="level is-mobile" href="#Host"><span class="level-left"><span class="level-item">3.7</span><span class="level-item">Host</span></span></a></li></ul></li><li><a class="level is-mobile" href="#总结"><span class="level-left"><span class="level-item">4</span><span class="level-item">总结</span></span></a></li></ul></div></div><style>#toc .menu-list > li > a.is-active + .menu-list { display: block; }#toc .menu-list > li > a + .menu-list { display: none; }</style><script src="/js/toc.js" defer></script></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/Feed%E6%9C%8D%E5%8A%A1/"><span class="tag">Feed服务</span><span class="tag">3</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Knative/"><span class="tag">Knative</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Kubernetes/"><span class="tag">Kubernetes</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Linux%E7%BD%91%E7%BB%9C/"><span class="tag">Linux网络</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Serverless/"><span class="tag">Serverless</span><span class="tag">5</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Yarn/"><span class="tag">Yarn</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E4%B8%80%E8%87%B4%E6%80%A7/"><span class="tag">分布式一致性</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%9C%A8%E7%A6%BB%E7%BA%BF%E6%B7%B7%E9%83%A8/"><span class="tag">在离线混部</span><span class="tag">4</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/"><span class="tag">大数据</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%99%BA%E8%83%BD%E8%BF%90%E7%BB%B4/"><span class="tag">智能运维</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E8%99%9A%E6%8B%9F%E5%8C%96/"><span class="tag">网络虚拟化</span><span class="tag">3</span></a></div></div></div></div></div><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg"></figure><p class="is-size-6 is-block">公众号：面向问题编程</p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives"><p class="title">51</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories"><p class="title">5</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags"><p class="title">11</p></a></div></div></nav></div></div><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/"><span class="level-start"><span class="level-item">一文了解</span></span><span class="level-end"><span class="level-item tag">23</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E5%AE%9E%E8%B7%B5/"><span class="level-start"><span class="level-item">技术实践</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/"><span class="level-start"><span class="level-item">技术架构</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BB%BC%E8%BF%B0/"><span class="level-start"><span class="level-item">综述</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E9%97%AE%E9%A2%98/"><span class="level-start"><span class="level-item">问题</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li></ul></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a><p class="is-size-7"><span>&copy; 2022 面向问题编程</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-CN");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/lg-zoom@1.3.0/dist/lg-zoom.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script type="text/x-mathjax-config">MathJax.Hub.Config({
+            'HTML-CSS': {
+                matchFontHeight: false
+            },
+            SVG: {
+                matchFontHeight: false
+            },
+            CommonHTML: {
+                matchFontHeight: false
+            },
+            tex2jax: {
+                inlineMath: [
+                    ['$','$'],
+                    ['\\(','\\)']
+                ]
+            }
+        });</script><script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.9/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script><!--!--><!--!--><!--!--><script src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script src="/js/insight.js" defer></script><script>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script></body></html>
