@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><title>携程混合云之Kubernetes at AWS揭秘 - 面向问题编程</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="面向问题编程"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="面向问题编程"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="一、引言随着携程国际化战略的实施和业务海外的部署，混合云已经达到了一定的规模。为了支持容器，我们在AWS上部署了kubernetes。主要是弹性发布的考量。"><meta property="og:type" content="blog"><meta property="og:title" content="携程混合云之Kubernetes at AWS揭秘"><meta property="og:url" content="https://www.heapoverflow.cn/pages/practice-xiecheng-k8s-1/"><meta property="og:site_name" content="面向问题编程"><meta property="og:description" content="一、引言随着携程国际化战略的实施和业务海外的部署，混合云已经达到了一定的规模。为了支持容器，我们在AWS上部署了kubernetes。主要是弹性发布的考量。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://www.heapoverflow.cn/img/practice-xiecheng-k8s-1/0.jpg"><meta property="article:published_time" content="2022-04-05T08:38:49.497Z"><meta property="article:modified_time" content="2022-04-05T08:44:37.735Z"><meta property="article:author" content="面向问题编程"><meta property="article:tag" content="Kubernetes"><meta property="twitter:card" content="summary"><meta property="twitter:image" content="/img/practice-xiecheng-k8s-1/0.jpg"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.heapoverflow.cn/pages/practice-xiecheng-k8s-1/"},"headline":"携程混合云之Kubernetes at AWS揭秘","image":["https://www.heapoverflow.cn/img/practice-xiecheng-k8s-1/0.jpg"],"datePublished":"2022-04-05T08:38:49.497Z","dateModified":"2022-04-05T08:44:37.735Z","author":{"@type":"Person","name":"面向问题编程"},"publisher":{"@type":"Organization","name":"面向问题编程","logo":{"@type":"ImageObject","url":"https://www.heapoverflow.cn/img/logo.svg"}},"description":"一、引言随着携程国际化战略的实施和业务海外的部署，混合云已经达到了一定的规模。为了支持容器，我们在AWS上部署了kubernetes。主要是弹性发布的考量。"}</script><link rel="canonical" href="https://www.heapoverflow.cn/pages/practice-xiecheng-k8s-1/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><script src="https://www.googletagmanager.com/gtag/js?id=G-ETGL163DQH" async></script><script>window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    
+        gtag('config', 'G-ETGL163DQH');</script><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><script data-ad-client="ca-pub-6757924689439593" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+          Array
+              .from(document.querySelectorAll('.tab-content'))
+              .forEach($tab => {
+                  $tab.classList.add('is-hidden');
+              });
+          Array
+              .from(document.querySelectorAll('.tabs li'))
+              .forEach($tab => {
+                  $tab.classList.remove('is-active');
+              });
+          const $activeTab = document.querySelector(location.hash);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+          const $tabMenu = document.querySelector(`a[href="${location.hash}"]`);
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 6.0.0"></head><body class="is-2-column"><nav class="navbar navbar-main"><div class="container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/categories/%E9%97%AE%E9%A2%98/">问题</a><a class="navbar-item" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/">技术架构</a><a class="navbar-item" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></div><div class="navbar-end"><a class="navbar-item" rel="noopener" title="分类" href="/categories">分类</a><a class="navbar-item" rel="noopener" title="标签" href="/tags">标签</a><a class="navbar-item" rel="noopener" title="归档" href="/archives">归档</a><a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;"><i class="fas fa-list-ul"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-9-widescreen"><div class="card"><div class="card-image"><span class="image is-7by3"><img class="fill" src="/img/practice-xiecheng-k8s-1/0.jpg" alt="携程混合云之Kubernetes at AWS揭秘"></span></div><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-04-05T08:38:49.497Z" title="2022/4/5 下午4:38:49">2022-04-05</time>发表</span><span class="level-item"><time dateTime="2022-04-05T08:44:37.735Z" title="2022/4/5 下午4:44:37">2022-04-05</time>更新</span><span class="level-item"><a class="link-muted" href="/categories/%E6%8A%80%E6%9C%AF%E5%AE%9E%E8%B7%B5/">技术实践</a></span><span class="level-item">24 分钟读完 (大约3544个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">携程混合云之Kubernetes at AWS揭秘</h1><div class="content"><h2 id="一、引言"><a href="#一、引言" class="headerlink" title="一、引言"></a><strong>一、引言</strong></h2><p>随着携程国际化战略的实施和业务海外的部署，混合云已经达到了一定的规模。为了支持容器，我们在AWS上部署了kubernetes。主要是弹性发布的考量。  </p>
+<span id="more"></span>
+
+<p>应用交付效率上，初始化一台虚拟机在分钟级别，涉及操作庞杂，除了启动虚拟机，还需要进行应用环境的安装，而拉起一台容器的时间可以控制在秒级。</p>
+<p>运维管理效率上，虚拟机的维护比容器要复杂得多，特别是在目前有着多个公有云合作厂商的情况下，工作量和复杂程度爆增。以镜像为例，自定义的镜像无法在不同公有云厂商之间进行统一，比如AWS的C5等系列要求我们安装ENA（Elastic Network Adapter）增强联网的驱动。目前我们在几家公有云上的自定义镜像是也是保持着异构的状态。</p>
+<p>所以，引入了混合云的容器发布。借助着业务在AWS的应用部署，有了Kubernetes@AWS的主题。</p>
+<p> </p>
+<h2 id="二、为什么在AWS上自己搭建kubernetes"><a href="#二、为什么在AWS上自己搭建kubernetes" class="headerlink" title="二、为什么在AWS上自己搭建kubernetes"></a><strong>二、为什么在AWS上自己搭建kubernetes</strong></h2><p>首先是网络上的重要考量，目前适配携程的技术体系需要满足两个网络适配的要求。</p>
+<p><strong>IP直连</strong>：存在应用互访是通过IP进行访问的情况，而且携程的应用并非全是跑在kubernetes集群中，所以为了保证全局应用的可用性，就需要容器的IP是kubernetes集群外可见的IP。</p>
+<p><strong>IP固定</strong>：假设应用在重新发布时IP发生变化，那必须有良好的机制通知各个相关的系统。但是目前存在有运维等系统的架构是基于IP固定这一前提条件。要完善这种架构不是一时之力，所以我们在这期项目的折中方案是适应当前的技术架构，保证容器应用在发布新版本、宿主机故障重新拉起容器时，IP保持不变。</p>
+<p>这两个需求都不是kubernetes可以原生支持的，kubernetes提供了Service、Ingress等服务暴露的方法，但是不能完全满足我们上述的网络需求，社区现成的flannel、calico等容器网络方案不能采用，需要进行定制化。</p>
+<p>同时，我们也针对kubernetes做了调度等层面的自定义开发。虽然AWS也发布了kubernetes产品——EKS，是一套打通公有云的方案，但也意味着失去了自定义开发及控制平面运维管控的能力。所以，我们也没有采用公有云的原生kubernetes产品。</p>
+<p>出于对定制化能力和控制平面管控的需求，也为了与私有云IDC的技术栈保持一致，尽量减少运维成本，进行过一系列的调研之后，我们最终选择自己在云上搭建kubernetes集群。</p>
+<p> </p>
+<h2 id="三、如何在AWS上自己搭建kubernetes"><a href="#三、如何在AWS上自己搭建kubernetes" class="headerlink" title="三、如何在AWS上自己搭建kubernetes"></a><strong>三、如何在AWS上自己搭建kubernetes</strong></h2><p>主要从网络、镜像、日志监控这几个组件讲讲我们的方案选型及设计。</p>
+<p> </p>
+<h3 id="3-1-网络"><a href="#3-1-网络" class="headerlink" title="3.1 网络"></a><strong>3.1 网络</strong></h3><p>容器网络的方案我们是基于VPC（Virtual Private Cloud）和弹性网络接口（Elastic Network Interface，ENI）进行实现的。</p>
+<p>VPC是一个用户在公有云上自建的隔离的虚拟网络，可以自定义地址空间段。我们以一个地域（Region）为例，一个VPC在其中一个可用区内的架构大致如下：</p>
+<p><img src="/img/practice-xiecheng-k8s-1/0.jpg"></p>
+<p>每个可用区内有一个公有子网和一个私有子网。</p>
+<p><strong>公有子网</strong>：想对internet直接暴露的服务一般部署在公有子网，给实例绑定一个弹性IP（公有IP），Internet即可通过这个公网IP进行访问。公有子网里的缺省路由是Internet网关，由Internet网关实现VPC与Internet之间的通信。其中公有子网里有个NAT网关，有对应的私有IP和公有IP。NAT网关的作用是允许私有子网中的实例连接到Internet或其他AWS服务的能力，但能避免Internet直接连接这些实例。</p>
+<p><strong>私有子网</strong>：一般用于供内部调用的服务，如数据库、应用后端等。私有子网里的实例如果要访问Internet上的服务，与私有IDC里通过代理实现的方式不一样，会通过描述私有子网的缺省路由为公有子网里的NAT网关，实现与Internet的通信。</p>
+<p>图上子网里实例的私有IP地址，其实是和弹性网络接口（Elastic Network Interface，ENI）相关的。它是VPC中的一个逻辑网络组件，特性如下：</p>
+<p>1个弹性网络接口具有：</p>
+<ul>
+<li><p>1个Mac地址  </p>
+</li>
+<li><p>1个主要私有IP地址</p>
+</li>
+<li><p>多个辅助私有IP地址</p>
+</li>
+<li><p>1个或多个安全组，需要注意的是：ENI上的IP地址的安全组是跟随着对应网卡的安全组而决定出入控制的。</p>
+</li>
+</ul>
+<p>其中每个私有IP地址都可以绑定一个弹性IP。</p>
+<p>一个实例可以有多个弹性网络接口：</p>
+<ul>
+<li><p>1个主要弹性网络接口，不可插拔，如ifconfig中eth0</p>
+</li>
+<li><p>多个辅助网络接口，可动态插拔，如ifconfig中eth1~n</p>
+</li>
+</ul>
+<p><img src="/img/practice-xiecheng-k8s-1/1.jpg"></p>
+<p>实例可以容纳的最大弹性网络接口数和每个接口的最大IP地址个数是有限制的，一般来说，与实例类型相关，总体来说与配置成正比。</p>
+<p>利用弹性网络接口，我们衍生出了两种容器网络的子方案：</p>
+<ul>
+<li><p>单网卡多IP</p>
+</li>
+<li><p>单网卡单IP</p>
+</li>
+</ul>
+<p> </p>
+<p><strong>单网卡多IP容器网络方案</strong></p>
+<p><img src="/img/practice-xiecheng-k8s-1/2.jpg"></p>
+<p>该方案的网络要点在于：一个弹性网络接口绑定多个IP，其中第一个IP（主要私有IP）作为宿主机对外通信的IP，后面的IP（辅助私有IP）是容器的IP。容器和宿主机之间通过veth pair进行连接，同时通过路由表进行容器出入流量的控制。</p>
+<p> </p>
+<p><strong>单网卡单IP容器网络方案</strong></p>
+<p><img src="/img/practice-xiecheng-k8s-1/3.jpg"></p>
+<p>虽然一个弹性网络接口可以绑定多个IP，但是也提高了复杂性。该单网卡单IP子方案中，把一个弹性网络接口作为一个调度的单元，每个弹性网络接口只使用一个IP，其中第一个弹性网络接口（eth0）留给宿主机继续使用，在实例上添加新的辅助弹性网络接口（eth1-N），并把弹性网络接口移入容器的网络命名空间，直接给容器使用。对比如下：</p>
+<table cellspacing="0" cellpadding="0"><tbody><tr><td width="94" valign="top" style="border-width: 1px;border-color: windowtext;padding: 0px 7px;"><p style="text-align:center;"><span style="font-size: 12px;"><strong>网络子方案</strong></span></p></td><td width="208" valign="top" style="border-top-width: 1px;border-right-width: 1px;border-bottom-width: 1px;border-top-color: windowtext;border-right-color: windowtext;border-bottom-color: windowtext;border-left: none;padding: 0px 7px;"><p style="text-align:center;"><span style="font-size: 12px;"><strong>优势</strong></span></p></td><td width="251" valign="top" style="border-top-width: 1px;border-right-width: 1px;border-bottom-width: 1px;border-top-color: windowtext;border-right-color: windowtext;border-bottom-color: windowtext;border-left: none;padding: 0px 7px;"><p style="text-align:center;"><span style="font-size: 12px;"><strong>劣势</strong></span></p></td></tr><tr><td width="94" valign="top" style="border-right-width: 1px;border-bottom-width: 1px;border-left-width: 1px;border-right-color: windowtext;border-bottom-color: windowtext;border-left-color: windowtext;border-top: none;padding: 0px 7px;"><p style="text-align:center;"><span style="font-size: 12px;">单网卡多IP</span></p></td><td width="208" valign="top" style="border-top: none;border-left: none;border-bottom-width: 1px;border-bottom-color: windowtext;border-right-width: 1px;border-right-color: windowtext;padding: 0px 7px;"><p style="text-align:left;"><span style="font-size: 12px;">可部署的Pod个数较多，资源利用率高</span></p></td><td width="251" valign="top" style="border-top: none;border-left: none;border-bottom-width: 1px;border-bottom-color: windowtext;border-right-width: 1px;border-right-color: windowtext;padding: 0px 7px;"><p style="text-align:left;"><span style="font-size: 12px;">调度层要选择可容纳新IP的网卡</span></p><p style="text-align:left;"><span style="font-size: 12px;">IP的出入访问由网卡的安全组决定，调度还需选择对应安全组的网卡</span></p></td></tr><tr><td width="94" valign="top" style="border-right-width: 1px;border-bottom-width: 1px;border-left-width: 1px;border-right-color: windowtext;border-bottom-color: windowtext;border-left-color: windowtext;border-top: none;padding: 0px 7px;"><p style="text-align:center;"><span style="font-size: 12px;">单网卡单IP</span></p></td><td width="208" valign="top" style="border-top: none;border-left: none;border-bottom-width: 1px;border-bottom-color: windowtext;border-right-width: 1px;border-right-color: windowtext;padding: 0px 7px;"><p style="text-align:left;"><span style="font-size: 12px;">独占网卡设备，便于隔离</span></p><p style="text-align:left;"><span style="font-size: 12px;">无新增的虚拟化层，性能是网卡的性能</span></p></td><td width="251" valign="top" style="border-top: none;border-left: none;border-bottom-width: 1px;border-bottom-color: windowtext;border-right-width: 1px;border-right-color: windowtext;padding: 0px 7px;"><p style="text-align:left;"><span style="font-size: 12px;">只利用了网卡上的第一个IP，可容纳的Pod个数较少，资源利用率相对较少</span></p></td></tr></tbody></table>
+ 
+
+<p>我们最终选择了单网卡单IP的子方案，原因在于，比较简单，同时，承载的主要是Java应用，对应的配置一般不会太低，不会有很明显的资源浪费。</p>
+<p> </p>
+<p>可以看到，如上的网络方案，由于容器的IP其实是VPC范畴地址空间段的IP地址，所以可以达到kubernetes集群外IP可见的需求，还有IP固定的需求，是这么实现的。</p>
+<p><img src="/img/practice-xiecheng-k8s-1/4.jpg"></p>
+<p>有一个全局的IP地址管理模块，简称GIPAM，它存储了pod name（我们使用的是Statefulset）与IP的一对一关系，并负责与公有云进行API的交互。Node上的cni插件，在设置网络前，先去GIPAM上查询一下IP的信息。应用重新发布，故障迁移，重新拉起一个容器时，不管是不是在同个node，由于cni插件会以GIPAM作为IP的数据源，这样就保证了IP的固定和漂移。</p>
+<p>举个创建容器网络的图例：</p>
+<p><img src="/img/practice-xiecheng-k8s-1/5.jpg"></p>
+<h3 id="3-2-镜像"><a href="#3-2-镜像" class="headerlink" title="3.2 镜像"></a><strong>3.2 镜像</strong></h3><p>我们在私有云的每个IDC都部署了一套Harbor，组成了Harbor集群联邦，并且跨越测试环境和生产环境。并使用了DNS劫持的技术，推送docker镜像时，是往各自IDC的Harbor进行推送，后台自动异步地同步到其他IDC。保证应用在部署时优先从同IDC的Harbor进行镜像的拉取，如果失败，再跨IDC拉取镜像，减少应用拉起的时间。</p>
+<p>在AWS上我们选择了自己搭建Harbor，后端的存储采用S3。由于目前我们在公有云IDC上的应用相对较少，暂时未加入联邦，未开启自动同步，在发布流程上保证在应用在部署时预先推送镜像到AWS IDC的Harbor。同样也使用了DNS劫持技术，保证使用同样的镜像域名。</p>
+<p><img src="/img/practice-xiecheng-k8s-1/6.jpg"></p>
+<p> </p>
+<h3 id="3-3-日志监控"><a href="#3-3-日志监控" class="headerlink" title="3.3 日志监控"></a><strong>3.3 日志监控</strong></h3><p>网络解决了，镜像可以拉取了，可以正式拉起一台容器了。那监控和日志是如何解决的呢？</p>
+<p><img src="/img/practice-xiecheng-k8s-1/7.jpg"></p>
+<p>在公有云我们部署了一套与私有云一致的日志监控系统，hickwall、grafana等，采用了Prometheus+Telegraf+InfluxDB+Grafana等与私有云一致的技术栈。在云上采集，云上处理，只送回必要的告警数据，并对接了NOC体系，进行7*24的监控。</p>
+<h2 id="四、同步私有云数据到公有云及疑难杂症"><a href="#四、同步私有云数据到公有云及疑难杂症" class="headerlink" title="四、同步私有云数据到公有云及疑难杂症"></a><strong>四、同步私有云数据到公有云及疑难杂症</strong></h2><h3 id="4-1-同步私有云数据到公有云"><a href="#4-1-同步私有云数据到公有云" class="headerlink" title="4.1 同步私有云数据到公有云"></a><strong>4.1 同步私有云数据到公有云</strong></h3><p>涉及到IDC之间大量数据的同步，我们是采用公网传输的方式，毕竟专线带宽有限而且昂贵。有关AWS数据的流量费用，可以总结为：</p>
+<p>如果服务部署在私有子网，与Internet的通信会经过NAT网关。经过NAT网关的流量不管出入，一律收取数据处理费用。</p>
+<p>如果服务部署在公有子网，通过公网IP与Internet通信。而公网IP的收费模式是只收出流量，进流量不收费。</p>
+<p>所以我们通用的把数据从私有IDC同步到公有云的部署架构是：把数据收集服务部署在公有子网，实例带有公有IP，私有云IDC的推送服务通过Internet进行数据的推送。</p>
+<p><img src="/img/practice-xiecheng-k8s-1/8.jpg"></p>
+<p>同样，如果公有云上的服务需要从外部供应商拉取的数据量比较大，我们也是采用服务部署在公有子网的模式。如此节省了经过NAT网关的数据处理费用。</p>
+<h3 id="4-2-AWS-ELB负载均衡不支持回环路由"><a href="#4-2-AWS-ELB负载均衡不支持回环路由" class="headerlink" title="4.2 AWS ELB负载均衡不支持回环路由"></a><strong>4.2 AWS ELB负载均衡不支持回环路由</strong></h3><p>我们通过AWS ELB（Elastic Load Balancing）把kubernetes api server组成一个高可用的集群，但是上线后，发现在master节点上使用kubectl命令经常会超时，集群中也有比较多的访问api-server的i&#x2F;o timeout日志。</p>
+<p>这个问题在于通过实例id进行注册的ELB不支持回环路由。即通过实例id注册到ELB的目标时，客户端的源IP地址会保留，ELB在路由后发现源地址和目的地址相同，会丢弃这些包，连接仅在请求路由到不同的实例时才会成功。Kubernetes在部署架构中，通常采用混合部署的模式，在同一台主机上同时启用kube-scheduler、kube-api等组件。</p>
+<p>该问题可以通过改用通过IP地址注册目标到ELB负载均衡进行解决。为了支持这种应用混布场景，AWS推出了通过IP地址进行注册的ELB负载均衡，即可避免不支持回环路由而导致连接超时的问题。</p>
+<p><img src="/img/practice-xiecheng-k8s-1/9.jpg"></p>
+<h3 id="4-3-kubelet进程max-pods设置"><a href="#4-3-kubelet进程max-pods设置" class="headerlink" title="4.3 kubelet进程max-pods设置"></a><strong>4.3 kubelet进程max-pods设置</strong></h3><p>由于我们的网络方案受限于实例上弹性网络接口的最大个数，要注意在kubernetes node上对kubelet进程的max-pods参数进行设置以限制Pod的最大数量。</p>
+<p> </p>
+<h2 id="五、总结"><a href="#五、总结" class="headerlink" title="五、总结"></a><strong>五、总结</strong></h2><p>本文首先介绍了在携程混合云平台上支持容器发布的背景，并引出了自搭kubernetes的初衷，要适配的网络需求，再详细从网络、镜像、日志监控等组件介绍了携程在AWS自己搭建kubernetes的方案选型及设计，接着给出了从私有云IDC同步数据到公有云的通用部署架构，并从几个示例介绍了探索过程中碰到过的注意事项。</p>
+<p>我们在混合云上的广大探索还在持续中，欢迎继续关注互相交流学习。</p>
+<article class="message message-immersive is-primary">
+<div class="message-body">
+<i class="fas fa-globe-asia mr-2"></i>本文来自
+<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/r7HeP6FCr6ZbHIRsOt0kcg">携程技术</a>.
+</div>
+</article>
+    </div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/Kubernetes/">Kubernetes</a></div><!--!--><div><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6757924689439593" crossOrigin="anonymous"></script><ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-6757924689439593" data-ad-slot="2352785969"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div></article></div><!--!--><nav class="post-navigation mt-4 level is-mobile"><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/pages/python-async/"><span class="level-item">Python异步编程：从多线程到协程</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--><div style="width:100%"><script src="https://giscus.app/client.js" data-repo="thetechstack/thetechstack.github.io" data-repo-id="R_kgDOG6Ti1Q" data-category="Announcements" data-category-id="DIC_kwDOG6Ti1c4COQtm" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light" data-lang="zh-CN" crossOrigin="anonymous" async></script></div></div><!--!--><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen  order-3 is-sticky"><div class="card widget" id="toc" data-type="toc"><div class="card-content"><div class="menu"><h3 class="menu-label">目录</h3><ul class="menu-list"><li><a class="level is-mobile" href="#一、引言"><span class="level-left"><span class="level-item">1</span><span class="level-item">一、引言</span></span></a></li><li><a class="level is-mobile" href="#二、为什么在AWS上自己搭建kubernetes"><span class="level-left"><span class="level-item">2</span><span class="level-item">二、为什么在AWS上自己搭建kubernetes</span></span></a></li><li><a class="level is-mobile" href="#三、如何在AWS上自己搭建kubernetes"><span class="level-left"><span class="level-item">3</span><span class="level-item">三、如何在AWS上自己搭建kubernetes</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#3-1-网络"><span class="level-left"><span class="level-item">3.1</span><span class="level-item">3.1 网络</span></span></a></li><li><a class="level is-mobile" href="#3-2-镜像"><span class="level-left"><span class="level-item">3.2</span><span class="level-item">3.2 镜像</span></span></a></li><li><a class="level is-mobile" href="#3-3-日志监控"><span class="level-left"><span class="level-item">3.3</span><span class="level-item">3.3 日志监控</span></span></a></li></ul></li><li><a class="level is-mobile" href="#四、同步私有云数据到公有云及疑难杂症"><span class="level-left"><span class="level-item">4</span><span class="level-item">四、同步私有云数据到公有云及疑难杂症</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#4-1-同步私有云数据到公有云"><span class="level-left"><span class="level-item">4.1</span><span class="level-item">4.1 同步私有云数据到公有云</span></span></a></li><li><a class="level is-mobile" href="#4-2-AWS-ELB负载均衡不支持回环路由"><span class="level-left"><span class="level-item">4.2</span><span class="level-item">4.2 AWS ELB负载均衡不支持回环路由</span></span></a></li><li><a class="level is-mobile" href="#4-3-kubelet进程max-pods设置"><span class="level-left"><span class="level-item">4.3</span><span class="level-item">4.3 kubelet进程max-pods设置</span></span></a></li></ul></li><li><a class="level is-mobile" href="#五、总结"><span class="level-left"><span class="level-item">5</span><span class="level-item">五、总结</span></span></a></li></ul></div></div><style>#toc .menu-list > li > a.is-active + .menu-list { display: block; }#toc .menu-list > li > a + .menu-list { display: none; }</style><script src="/js/toc.js" defer></script></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/CPython/"><span class="tag">CPython</span><span class="tag">5</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Feed%E6%9C%8D%E5%8A%A1/"><span class="tag">Feed服务</span><span class="tag">3</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Knative/"><span class="tag">Knative</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Kubernetes/"><span class="tag">Kubernetes</span><span class="tag">23</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Linux%E7%BD%91%E7%BB%9C/"><span class="tag">Linux网络</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Python/"><span class="tag">Python</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Serverless/"><span class="tag">Serverless</span><span class="tag">5</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Yarn/"><span class="tag">Yarn</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E4%B8%80%E8%87%B4%E6%80%A7/"><span class="tag">分布式一致性</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%9C%A8%E7%A6%BB%E7%BA%BF%E6%B7%B7%E9%83%A8/"><span class="tag">在离线混部</span><span class="tag">4</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/"><span class="tag">大数据</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%97%B6%E9%97%B4%E5%BA%8F%E5%88%97/"><span class="tag">时间序列</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%99%BA%E8%83%BD%E8%BF%90%E7%BB%B4/"><span class="tag">智能运维</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BC%96%E8%AF%91%E5%8E%9F%E7%90%86/"><span class="tag">编译原理</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E8%99%9A%E6%8B%9F%E5%8C%96/"><span class="tag">网络虚拟化</span><span class="tag">3</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AF%AD%E8%A8%80%E7%89%B9%E6%80%A7/"><span class="tag">语言特性</span><span class="tag">2</span></a></div></div></div></div></div><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg"></figure><p class="is-size-6 is-block">公众号：面向问题编程</p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives"><p class="title">62</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories"><p class="title">5</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags"><p class="title">16</p></a></div></div></nav></div></div><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/"><span class="level-start"><span class="level-item">一文了解</span></span><span class="level-end"><span class="level-item tag">26</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E5%AE%9E%E8%B7%B5/"><span class="level-start"><span class="level-item">技术实践</span></span><span class="level-end"><span class="level-item tag">9</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/"><span class="level-start"><span class="level-item">技术架构</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BB%BC%E8%BF%B0/"><span class="level-start"><span class="level-item">综述</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E9%97%AE%E9%A2%98/"><span class="level-start"><span class="level-item">问题</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li></ul></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a><p class="is-size-7"><span>&copy; 2022 面向问题编程</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-CN");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/lg-zoom@1.3.0/dist/lg-zoom.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script type="text/x-mathjax-config">MathJax.Hub.Config({
+            'HTML-CSS': {
+                matchFontHeight: false
+            },
+            SVG: {
+                matchFontHeight: false
+            },
+            CommonHTML: {
+                matchFontHeight: false
+            },
+            tex2jax: {
+                inlineMath: [
+                    ['$','$'],
+                    ['\\(','\\)']
+                ]
+            }
+        });</script><script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.9/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script><!--!--><!--!--><!--!--><script src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script src="/js/insight.js" defer></script><script>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script></body></html>
