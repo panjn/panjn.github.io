@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><title>阿里达摩院刘春辰：鲁棒时序异常检测与周期识别 - 面向问题编程</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="面向问题编程"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="面向问题编程"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="2021国际AIOps挑战赛决赛暨AIOps创新高峰论坛于2021年5月13日在北京成功举行。本文根据阿里巴巴达摩院-机器智能技术-决策智能实验室高级算法专家刘春辰博士分享的《鲁棒时序异常检测与周期识别》报告，整理而成。"><meta property="og:type" content="blog"><meta property="og:title" content="阿里达摩院刘春辰：鲁棒时序异常检测与周期识别"><meta property="og:url" content="https://www.heapoverflow.cn/pages/practice-ali-robustx/"><meta property="og:site_name" content="面向问题编程"><meta property="og:description" content="2021国际AIOps挑战赛决赛暨AIOps创新高峰论坛于2021年5月13日在北京成功举行。本文根据阿里巴巴达摩院-机器智能技术-决策智能实验室高级算法专家刘春辰博士分享的《鲁棒时序异常检测与周期识别》报告，整理而成。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://www.heapoverflow.cn/img/practice-ali-robustx/1.jpg"><meta property="article:published_time" content="2022-04-05T01:52:35.992Z"><meta property="article:modified_time" content="2022-04-05T02:05:40.228Z"><meta property="article:author" content="面向问题编程"><meta property="article:tag" content="时间序列"><meta property="twitter:card" content="summary"><meta property="twitter:image" content="/img/practice-ali-robustx/1.jpg"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.heapoverflow.cn/pages/practice-ali-robustx/"},"headline":"阿里达摩院刘春辰：鲁棒时序异常检测与周期识别","image":["https://www.heapoverflow.cn/img/practice-ali-robustx/1.jpg"],"datePublished":"2022-04-05T01:52:35.992Z","dateModified":"2022-04-05T02:05:40.228Z","author":{"@type":"Person","name":"面向问题编程"},"publisher":{"@type":"Organization","name":"面向问题编程","logo":{"@type":"ImageObject","url":"https://www.heapoverflow.cn/img/logo.svg"}},"description":"2021国际AIOps挑战赛决赛暨AIOps创新高峰论坛于2021年5月13日在北京成功举行。本文根据阿里巴巴达摩院-机器智能技术-决策智能实验室高级算法专家刘春辰博士分享的《鲁棒时序异常检测与周期识别》报告，整理而成。"}</script><link rel="canonical" href="https://www.heapoverflow.cn/pages/practice-ali-robustx/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><script src="https://www.googletagmanager.com/gtag/js?id=G-ETGL163DQH" async></script><script>window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    
+        gtag('config', 'G-ETGL163DQH');</script><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><script data-ad-client="ca-pub-6757924689439593" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+          Array
+              .from(document.querySelectorAll('.tab-content'))
+              .forEach($tab => {
+                  $tab.classList.add('is-hidden');
+              });
+          Array
+              .from(document.querySelectorAll('.tabs li'))
+              .forEach($tab => {
+                  $tab.classList.remove('is-active');
+              });
+          const $activeTab = document.querySelector(location.hash);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+          const $tabMenu = document.querySelector(`a[href="${location.hash}"]`);
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 6.0.0"></head><body class="is-2-column"><nav class="navbar navbar-main"><div class="container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/categories/%E9%97%AE%E9%A2%98/">问题</a><a class="navbar-item" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/">技术架构</a><a class="navbar-item" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></div><div class="navbar-end"><a class="navbar-item" rel="noopener" title="分类" href="/categories">分类</a><a class="navbar-item" rel="noopener" title="标签" href="/tags">标签</a><a class="navbar-item" rel="noopener" title="归档" href="/archives">归档</a><a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;"><i class="fas fa-list-ul"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-9-widescreen"><div class="card"><div class="card-image"><span class="image is-7by3"><img class="fill" src="/img/practice-ali-robustx/1.jpg" alt="阿里达摩院刘春辰：鲁棒时序异常检测与周期识别"></span></div><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-04-05T01:52:35.992Z" title="2022/4/5 上午9:52:35">2022-04-05</time>发表</span><span class="level-item"><time dateTime="2022-04-05T02:05:40.228Z" title="2022/4/5 上午10:05:40">2022-04-05</time>更新</span><span class="level-item"><a class="link-muted" href="/categories/%E6%8A%80%E6%9C%AF%E5%AE%9E%E8%B7%B5/">技术实践</a></span><span class="level-item">34 分钟读完 (大约5139个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">阿里达摩院刘春辰：鲁棒时序异常检测与周期识别</h1><div class="content"><p>2021国际AIOps挑战赛决赛暨AIOps创新高峰论坛于2021年5月13日在北京成功举行。本文根据阿里巴巴达摩院-机器智能技术-决策智能实验室高级算法专家刘春辰博士分享的《鲁棒时序异常检测与周期识别》报告，整理而成。</p>
+<span id="more"></span>
+
+<p><img src="/img/practice-ali-robustx/1.jpg"></p>
+<p>尊敬的各位来宾，大家好：  </p>
+<p>我是刘春辰，来自于阿里巴巴达摩院决策智能实验室，聚焦于时序分析、XAI、因果推断、MindOpt大规模优化求解器等技术方向，探索数据决策过程中核心问题的解决，打造统一的数据决策产品，以及相应的商业化落地。</p>
+<p>在这里，主要对 “鲁棒时序异常检测与周期识别”这项技术，跟大家做一个分享。</p>
+<h2 id="团队介绍"><a href="#团队介绍" class="headerlink" title="团队介绍"></a>团队介绍</h2><p>首先对我们的团队做个介绍，其次介绍“鲁棒时序算法”，最后是对这一系列算法相对应的落地效果与产品建设，进行一个简单的说明。</p>
+<p><img src="/img/practice-ali-robustx/2.jpg"></p>
+<p>我们的团队非常的多元化，分布在北京、杭州、西雅图等多个分部，主要关注于数据决策闭环中一些核心技术的研究，以及相应的产品的开发。比如说，基于相应的研发的技术，开发了MindAnalytics数据决策产品，目前已经在阿里巴巴集团内部10多个部门进行了成功的部署和应用，取得了很好的效果。同时，一些相应的研究成果也在国际顶级的会议（如KDD、SIGMOD、AAAI、IJCAI、ICASSP）进行了发表。  </p>
+<p><img src="/img/practice-ali-robustx/3.jpg"></p>
+<p>正如前所述，在数据决策闭环中一些关键的技术研究，那么什么是数据决策闭环？</p>
+<p>所谓的数据决策闭环，首先要针对观测到的数据进行数据监控（实时监测数据，及时发现异常）；进一步的，进行数据的洞察诊断（一方面，基于历史数据，自动发现数据生成机制；另一方面，基于发现的机制和异常，进行异常的归因下钻，定位导致异常的根因）；在决策假设步骤，我们针对诊断结果，利用决策优化技术进行自动策略建议以改善目标；最后，通过决策检验技术检验策略的效果，形成反馈指导进一步的策略优化。 </p>
+<p>我们的产品对该闭环进行全链路支持，重点关注如下技术：时序、下钻、因果。</p>
+<p>这张图展示了在时序分析领域的技术布局，具体包括时序异常检测、时序预测、Auto-scaling三个主要方向。</p>
+<p>其中，在异常检测领域，我们关注spike&amp;dip异常、趋势异常、方差异常、多metric异常等问题，提出了RobustPeriod周期检测、RobustSTL时序数据分解、RobustTrend趋势分解、多尺度数据分析、方差&#x2F;波动分析等多项技术。</p>
+<p>在时序预测领域，重点关注长期趋势预测、时空预测等问题。在Auto-scaling领域，关注主动Auto-scaling，被动Auto-scaling务指标的需求。所谓主动Auto-scaling，即在云上预测一些业服务请求，如qps指标，并针对业务指标，请求计算需要的计算、存储等相关资源，当诊断出资源不足或过剩等问题时，会进行主动Auto-scaling，以达到节省资源或者避免任务受损等问题；而被动Auto-scaling主要解决当发生突发请求或者qps预测不准确时，如何快速实施Auto-scaling，避免损失。</p>
+<h2 id="时序数据监控中的主要挑战"><a href="#时序数据监控中的主要挑战" class="headerlink" title="时序数据监控中的主要挑战"></a><strong>时序数据监控中的主要挑战</strong></h2><p>现在介绍一下我们本次分享的一个重点的部分，即时序数据检测这个领域的一些主要问题，以及解决方案。</p>
+<p><img src="/img/practice-ali-robustx/4.jpg"></p>
+<p>在时序数据监控领域，其实有很多技术挑战：比如说周期是非常复杂的，可能是无周期的、单周期的或者多周期的。同时即便是单周期，它里面会有很多的这种周期的偏移幅度的变化等等。这种周期的趋势它也会包含一些周期，趋势的缓变、突变现象。</p>
+<p>另外，在实际数据中大量噪声是一种常见的情况，更重要的是，这种智能运维本身对实质性处理要求很高，要求算法的计算复杂度必须要低，能够进行及时的服务响应，这点很重要。</p>
+<p>为了应对这些挑战，我们提出了鲁棒周期检测RobustPeriod跟周期分解RobustSTL&#x2F;RobustTrend的解决方案框架。这张图展示了解决方案的框架。一般是针对输入的时序数据，首先会调用这种鲁棒的周期检测RobustPeriod算法，判断数据是不是有周期，有几重周期以及周期的长度，如果这个数据是没有周期的，会调用趋势分解RobustTrend算法，将这种时序数据分解成这个趋势的成分和残差的成分。</p>
+<p>如果它是有周期的，会调用RobustSTL的这种周期趋势分解的算法，聚焦数据分解成这个趋势的部分，周期的部分跟残差的部分，进一步数据实际应用中，用户想知道说各种各样的异常类型分别是什么，会利用分解出的各种信号，要用不同的这种决策检验技术去判断说到底是什么异常的类型，这个是的一个大的框架。</p>
+<h2 id="RobustPeriod：鲁棒周期检测算法"><a href="#RobustPeriod：鲁棒周期检测算法" class="headerlink" title="RobustPeriod：鲁棒周期检测算法"></a><strong>RobustPeriod：鲁棒周期检测算法</strong></h2><p>然后接下来会重点介绍时序周期的检测和周期分解的技术。</p>
+<p><img src="/img/practice-ali-robustx/5.jpg"></p>
+<p>首先看一下周期检测技术，是因为在这块技术的细节不做过多的说明了，如果大家感兴趣可以查阅一下我们的paper，我们都有相关的文章发表。</p>
+<p>首先看一下周期检测技术RobustPeriod，这里有很多重要的挑战。最重要的一个挑战是多成分的干扰问题。这种周期检测不仅受周期成分的干扰，还受很多其他成分的干扰。比如说右侧右上角图案，显示会有一个趋势的突变，有一些变异点，或者说最下边这两张图，在有红色标记的地方，存在大量的数据缺失（红色是简单的线性内插），包括左上角这个图显示的是非常稀疏的时序数据情况。还会有多重周期的问题，比如说天周期、周周期、年周期都是同时存在交织在一起的。如何更好的识别，就是右边的第二张图就是一个示例。</p>
+<p>由于不同的时序的曲线，它背后的业务背景模式、背景是复杂多样的，很难去人工预设定一些先验的周期信息。</p>
+<p>实际业务中还会遇到很多特殊事件的干扰，比如说左边的第二张图，中间那张图就是一个特殊的事件干扰的例子，比如说阿里巴巴内部有什么双十一、小长假，这些特殊事件，对整个时序性造成很大干扰。为了解决这些挑战，我们提出了时序周期检测框架。</p>
+<p>简单来说它分为三部分：</p>
+<h3 id="去除趋势"><a href="#去除趋势" class="headerlink" title="去除趋势"></a>去除趋势</h3><p>第一部分，首先会用去趋势影响：鲁棒trend filter这样的算法，对实际数据去做一个预处理，去滤除其中的这部分趋势的影响。</p>
+<p>接下来，我们研发了“去多周期之间影响：MODWT 小波，小波能量排序 ”的相关算法，把多周期的问题变成单周期的检测问题。最后一步，又开发了“鲁棒单周期检测：设计 Huber-Periodogram&#x2F;ACF ”，对这种周期进行更准确的检测。</p>
+<p><img src="/img/practice-ali-robustx/6.jpg"></p>
+<h3 id="多周期处理"><a href="#多周期处理" class="headerlink" title="多周期处理"></a>多周期处理</h3><p>第二部分是多周期处理方式，提出了基于MODWT (Maximal Overlap Discrete Wavelet Transform)的多周期分解算法。  </p>
+<p><strong>MODWT相对于DWT的优势：</strong></p>
+<p>能够更好的处理这些非平稳的这种时间序列，它也能够更有效的对小波方差进行更准确地估计。</p>
+<h3 id="鲁棒单周期检测"><a href="#鲁棒单周期检测" class="headerlink" title="鲁棒单周期检测"></a>鲁棒单周期检测</h3><p>在第三步，我们提出了鲁棒的单周期检测。核心思想是对传统的Periodogram&#x2F;ACF算法，我们利用huber loss来优化periodgram&#x2F;ACF模型的loss function。这种优化有两个直接的好处，第一个对这种大量的异常和噪音会更加的鲁棒。另外，这种计算复杂度会非常有效地降低，时效性性会非常好。</p>
+<h3 id="周期检测结果对比"><a href="#周期检测结果对比" class="headerlink" title="周期检测结果对比"></a><strong>周期检测结果对比</strong></h3><p><img src="/img/practice-ali-robustx/7.jpg"></p>
+<p>简单看一下这个算法的效果，左边这6张图描述的就是我们测试的一些实际中随机抽取来的一些数据，这里面蕴含了非常多的异常的信号。比如spike异常、多噪音、周期的变化等，各种各样的异常情况。</p>
+<p>右边 table展示的是性能的对比，其中Table中第一行标记了不同的测试集，括号中代表真实的周期个数和周期长度。其它算法在复杂数据下经常误检出多个周期，也会漏报掉真正的周期。</p>
+<p>通过这种对比结果，可以看到我们能够准确地识别出周期的个数，以及跟其他方法比，我们能更好地实现近似它的周期长度。</p>
+<h2 id="RobustSTL：鲁棒周期-趋势分解算法"><a href="#RobustSTL：鲁棒周期-趋势分解算法" class="headerlink" title="RobustSTL：鲁棒周期-趋势分解算法"></a><strong>RobustSTL：鲁棒周期-趋势分解算法</strong></h2><p><img src="/img/practice-ali-robustx/8.jpg"></p>
+<p>接下来，讲到的是周期趋势分解算法RobustSTL，其实周期分解算法一般情况都是把时序数据分解成它的趋势部分，周期部分以及噪声部分的累加的形式。现在有很多周期分解算法被提出来，但是都或多或少的出现一些问题，不能真正满足实践的需求。比如说它们不能有效的处理一些趋势的突变，有的对复杂周期问题的支持度不好，而有的可能受到噪声或者异常的干扰，导致鲁棒性不强。</p>
+<p>更重要的是，很多方法的计算复杂度很高，不利于大规模的部署，无法落地实施使用。</p>
+<p>所以我们提出了 <strong>RobustSTL鲁棒周期-趋势分解算法</strong>，应对这些挑战，其实有一个基础的STL算法以及它的一系列变体。</p>
+<h3 id="RobustSTL：基本算法"><a href="#RobustSTL：基本算法" class="headerlink" title="RobustSTL：基本算法"></a><strong>RobustSTL：基本算法</strong></h3><p>首先看一下这个基础的<strong>RobustSTL鲁棒周期-趋势分解算法</strong>，我们的模型有一个根据实际数据的假设，认为周期分量本身的变化是比较小的，而趋势分量它会出现突变。</p>
+<p><img src="/img/practice-ali-robustx/9.jpg"></p>
+<p>我们算法的主要思想是： </p>
+<p>模型假设周期分量的变化较小，而趋势分量可能会出现突变。 </p>
+<p>我们的RobustSTL是一个迭代算法，算法首先分解出趋势成分，然后分解出周期成分，最后根据残差修正。以上过程多次迭代，即可得到最优解。 </p>
+<p>其中核心步骤是趋势和周期提取： </p>
+<ol>
+<li><p>趋势提取部分：为了鲁棒处理异常，我们利用鲁棒的LAD(Least absolute deviations)损失函数；为了同时捕捉趋势的缓变和突变，我们利用双重L1正则。 </p>
+</li>
+<li><p>周期提取部分：考虑k个周期信号对应的邻域，利用非局部周期双边滤波权达到对噪音和周期偏移鲁棒特性。</p>
+</li>
+</ol>
+<p> </p>
+<h3 id="RobustSTL：适用于多周期的多尺度算法"><a href="#RobustSTL：适用于多周期的多尺度算法" class="headerlink" title="RobustSTL：适用于多周期的多尺度算法"></a><strong>RobustSTL：适用于多周期的多尺度算法</strong></h3><p><img src="/img/practice-ali-robustx/10.jpg"></p>
+<p>然后基于这个基础的RobustSTL，做了各种各样的算法扩展。比如说为了解决多周期的问题，把信号拆解成趋势信号，多周期累加的信号以及噪音信号。并且开发了这种三重L1正则建模分解多周期数据，可以跟踪多周期信号中的突变和缓变的现象。  </p>
+<p>做的第二个扩展是做多尺度扩展。提出了一个新的这种比较general的处理，多种分辨率数据分解的这样的一个框架，时间原因我就不介绍任何的细节了，大家感兴趣可以看我们的paper。</p>
+<h3 id="RobustSTL：高效算法"><a href="#RobustSTL：高效算法" class="headerlink" title="RobustSTL：高效算法"></a><strong>RobustSTL：高效算法</strong></h3><p><img src="/img/practice-ali-robustx/11.jpg"></p>
+<p>另外一个就是高效的算法。为了满足阿里巴巴内部海量数据，实时计算的需求，我们特别开发了针对RobustSTL的高效求解算法 （GADMM 通用化ADMM算法）。</p>
+<p>其中，整个方法里边最耗时的部分就是趋势求解的部分。这里展示下如果直接用ADMM求解趋势提取，复杂度是O(N^2)；采用我们提出的GADMM，充分利用循环矩阵求逆可以利用的FFT算法，把复杂度降低到O(NlogN)。</p>
+<h3 id="RobustSTL：SOTA对比"><a href="#RobustSTL：SOTA对比" class="headerlink" title="RobustSTL：SOTA对比"></a><strong>RobustSTL：SOTA对比</strong></h3><p><img src="/img/practice-ali-robustx/12.jpg"></p>
+<p>接下来，看一下这个方法的性能。从几个维度去看，一个是说能不能对噪音进行鲁棒，它的周期偏移趋势的变化，以及它的这种对这种多周期的处理问题。我们看到很多这种对比算法，它都会有一些或者在其中的一些小点上有一些不足，但如果我们的方法能够这些性能都能够很好的支持。</p>
+<p>左下角就是拿一个很简单的例子来说一下这个方法这种时效性，拿了一个15天的数据，大概是4320个节点，我们的方法的耗时大概是0.1秒就能够完成相应的这种分解，对比方法大家也可以看一下它的几种表现。</p>
+<p>然后右边这张表格来表示的实际分解效果对比 ，其中左上边这个(a)图是我们RobustSTL算法的性能表现，每张图都包括三部分，第一部分是趋势分解的部分，第二张图是周期分解的部分，第三个是噪音分解的部分。</p>
+<p>大家首先看这种趋势分解的部分，我们发现在这个例子里，在第60节点出现了趋势的突变，我们这个方法红色线标记的能够很好的捕捉到到突变，大家可以用对比的方法看，传统的部分它分解的都非常的平缓，它就没有把捕捉到突变，而且它把其中的一部分信号放到了对应的残差里面去。</p>
+<p>另外我们去看一下周期分解的部分，我们的方法能够发现随着时间的推移，它的周期是有一些波动的，我们的方法能够把细微的波动能够捕捉到，但是大家看对比的方法，他们本身得到的是没有任何变化的一个周期分解，一个表现。</p>
+<h2 id="异常检测落地实践"><a href="#异常检测落地实践" class="headerlink" title="异常检测落地实践"></a><strong>异常检测落地实践</strong></h2><p><img src="/img/practice-ali-robustx/13.jpg"></p>
+<p>在对这个算法做一个非常快的介绍之后，看一下异常检测序列的落地的情况。事实上，阿里巴巴内部的多个部门都做了成功的部署和上线，集中在搜索事业部和计算平台事业部做的部署，它们做的是典型的智能运维场景。</p>
+<p>在这种场景下，它们要做海量集群的实时检测，目前我们系统上线之后的日度调用量在百万次和千万次的level，达到的准确率在90%以上。</p>
+<p>这系统的一个重要的特性是能够有效的降低误报率。在采用这套系统之前的异常检测系统，每天会产生千级别的报警，而且中间有很多错误的报警。但用到我们的新的系统之后，目前已经降到百的级别，真正实现可用的程度。</p>
+<p>另外一个例子是在数据技术及产品部的部署，每天支持对淘宝商家，大概每天百亿级别的店铺，及指标数据的实时监控跟诊断。</p>
+<h2 id="Auto-Scaling以及实际落地"><a href="#Auto-Scaling以及实际落地" class="headerlink" title="Auto-Scaling以及实际落地"></a><strong>Auto-Scaling以及实际落地</strong></h2><p><img src="/img/practice-ali-robustx/14.jpg"></p>
+<p>这是刚才讲到的<strong>Auto-Scaling技术</strong>，基于周期检测分离的弹性伸缩：</p>
+<ul>
+<li><p>核心思想: 提取周期分量, 抓主要矛盾收益最大。</p>
+</li>
+<li><p>有效处理复杂周期变化, 噪音, 异常点&#x2F;块等挑战。</p>
+</li>
+</ul>
+<p>这个技术在我们集团内部也已经初步落地了，典型业务落地效果是：</p>
+<ul>
+<li><p>赋能阿里巴巴搜索事业部: 初期应用于88个核心场景10万core CPU，节省约1万core CPU。</p>
+</li>
+<li><p>阿里云Serverless (ACK, SAE, FC), 批处理ODPS, 流处理Blink等多个场景推进中。</p>
+</li>
+</ul>
+<h2 id="达摩院MinDAnalytics产品"><a href="#达摩院MinDAnalytics产品" class="headerlink" title="达摩院MinDAnalytics产品"></a><strong>达摩院MinDAnalytics产品</strong></h2><p><img src="/img/practice-ali-robustx/15.jpg"></p>
+<p>这个是达摩院开发的MinDAnalytics产品，也就是这个产品就是能够集成了我上述的这些时序分析，下传诊断以及因果部分的一个能力。这个产品它能够无虚拟进行任何的这种没有任何的这种领域的知识，只需要输入用户数据，就能够享受到自动化的监测跟洞察的服务。  </p>
+<p>这个产品的特点是，它能够进行大规模的数据计算，另外它能够在多个指标上进行并行监测，还能支持多维度根因分析。</p>
+<h2 id="阿里云Lindorm-数据库"><a href="#阿里云Lindorm-数据库" class="headerlink" title="阿里云Lindorm 数据库"></a><strong>阿里云Lindorm 数据库</strong></h2><p><img src="/img/practice-ali-robustx/16.jpg"></p>
+<p>前面介绍了我们的算法服务产品，接下来给大家介绍一下阿里巴巴集团在时序数据存储方面的产品，阿里云 Lindorm 数据。Lindorm 提供了多种数据库服务，包括 Hbase, 时序数据库，时空数据库等。其时序数据库兼容 Open TSDB API。在具体实现上，针对时序数据设计的压缩算法，压缩率最高为15：1，同时支持多种时序数据的降采样和预聚合。</p>
+<p>在时序数据库上，Lindorm 也提供了多种服务，包括时序数据分析服务等。我们 MindAnalytics 产品未来将直接在阿里云上提供服务。如果大家也对阿里的时序数据库感兴趣，也可以选用我们的 Lindorm 数据库，在 Lindorm 上会提供一些更加贴近 tsdb 的服务。</p>
+<p>谢谢大家。</p>
+<p>目前挑战赛部分演讲嘉宾的PPT已经上传，后续陆续更新，敬请期待！</p>
+<p>链接:<a target="_blank" rel="noopener" href="https://pan.baidu.com/s/19uvpB-WJjED-WPezVjkHbg">https://pan.baidu.com/s/19uvpB-WJjED-WPezVjkHbg</a>  </p>
+<p>密码:mctl</p>
+<article class="message message-immersive is-primary">
+<div class="message-body">
+<i class="fas fa-globe-asia mr-2"></i>本文来自
+<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/4g5sxH_8wWEJ6XYa7zkcxw">BizSeer必示</a>.
+</div>
+</article>
+    </div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/%E6%97%B6%E9%97%B4%E5%BA%8F%E5%88%97/">时间序列</a></div><!--!--><div><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6757924689439593" crossOrigin="anonymous"></script><ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-6757924689439593" data-ad-slot="2352785969"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div></article></div><!--!--><nav class="post-navigation mt-4 level is-mobile"><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/pages/practice-tx-k8s-1/"><span class="level-item">腾讯云私有化容器平台之网络</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--><div style="width:100%"><script src="https://giscus.app/client.js" data-repo="thetechstack/thetechstack.github.io" data-repo-id="R_kgDOG6Ti1Q" data-category="Announcements" data-category-id="DIC_kwDOG6Ti1c4COQtm" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light" data-lang="zh-CN" crossOrigin="anonymous" async></script></div></div><!--!--><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen  order-3 is-sticky"><div class="card widget" id="toc" data-type="toc"><div class="card-content"><div class="menu"><h3 class="menu-label">目录</h3><ul class="menu-list"><li><a class="level is-mobile" href="#团队介绍"><span class="level-left"><span class="level-item">1</span><span class="level-item">团队介绍</span></span></a></li><li><a class="level is-mobile" href="#时序数据监控中的主要挑战"><span class="level-left"><span class="level-item">2</span><span class="level-item">时序数据监控中的主要挑战</span></span></a></li><li><a class="level is-mobile" href="#RobustPeriod：鲁棒周期检测算法"><span class="level-left"><span class="level-item">3</span><span class="level-item">RobustPeriod：鲁棒周期检测算法</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#去除趋势"><span class="level-left"><span class="level-item">3.1</span><span class="level-item">去除趋势</span></span></a></li><li><a class="level is-mobile" href="#多周期处理"><span class="level-left"><span class="level-item">3.2</span><span class="level-item">多周期处理</span></span></a></li><li><a class="level is-mobile" href="#鲁棒单周期检测"><span class="level-left"><span class="level-item">3.3</span><span class="level-item">鲁棒单周期检测</span></span></a></li><li><a class="level is-mobile" href="#周期检测结果对比"><span class="level-left"><span class="level-item">3.4</span><span class="level-item">周期检测结果对比</span></span></a></li></ul></li><li><a class="level is-mobile" href="#RobustSTL：鲁棒周期-趋势分解算法"><span class="level-left"><span class="level-item">4</span><span class="level-item">RobustSTL：鲁棒周期-趋势分解算法</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#RobustSTL：基本算法"><span class="level-left"><span class="level-item">4.1</span><span class="level-item">RobustSTL：基本算法</span></span></a></li><li><a class="level is-mobile" href="#RobustSTL：适用于多周期的多尺度算法"><span class="level-left"><span class="level-item">4.2</span><span class="level-item">RobustSTL：适用于多周期的多尺度算法</span></span></a></li><li><a class="level is-mobile" href="#RobustSTL：高效算法"><span class="level-left"><span class="level-item">4.3</span><span class="level-item">RobustSTL：高效算法</span></span></a></li><li><a class="level is-mobile" href="#RobustSTL：SOTA对比"><span class="level-left"><span class="level-item">4.4</span><span class="level-item">RobustSTL：SOTA对比</span></span></a></li></ul></li><li><a class="level is-mobile" href="#异常检测落地实践"><span class="level-left"><span class="level-item">5</span><span class="level-item">异常检测落地实践</span></span></a></li><li><a class="level is-mobile" href="#Auto-Scaling以及实际落地"><span class="level-left"><span class="level-item">6</span><span class="level-item">Auto-Scaling以及实际落地</span></span></a></li><li><a class="level is-mobile" href="#达摩院MinDAnalytics产品"><span class="level-left"><span class="level-item">7</span><span class="level-item">达摩院MinDAnalytics产品</span></span></a></li><li><a class="level is-mobile" href="#阿里云Lindorm-数据库"><span class="level-left"><span class="level-item">8</span><span class="level-item">阿里云Lindorm 数据库</span></span></a></li></ul></div></div><style>#toc .menu-list > li > a.is-active + .menu-list { display: block; }#toc .menu-list > li > a + .menu-list { display: none; }</style><script src="/js/toc.js" defer></script></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/Feed%E6%9C%8D%E5%8A%A1/"><span class="tag">Feed服务</span><span class="tag">3</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Knative/"><span class="tag">Knative</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Kubernetes/"><span class="tag">Kubernetes</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Linux%E7%BD%91%E7%BB%9C/"><span class="tag">Linux网络</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Serverless/"><span class="tag">Serverless</span><span class="tag">5</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Yarn/"><span class="tag">Yarn</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E4%B8%80%E8%87%B4%E6%80%A7/"><span class="tag">分布式一致性</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%9C%A8%E7%A6%BB%E7%BA%BF%E6%B7%B7%E9%83%A8/"><span class="tag">在离线混部</span><span class="tag">4</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/"><span class="tag">大数据</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%97%B6%E9%97%B4%E5%BA%8F%E5%88%97/"><span class="tag">时间序列</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%99%BA%E8%83%BD%E8%BF%90%E7%BB%B4/"><span class="tag">智能运维</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E8%99%9A%E6%8B%9F%E5%8C%96/"><span class="tag">网络虚拟化</span><span class="tag">3</span></a></div></div></div></div></div><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg"></figure><p class="is-size-6 is-block">公众号：面向问题编程</p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives"><p class="title">52</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories"><p class="title">5</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags"><p class="title">12</p></a></div></div></nav></div></div><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/"><span class="level-start"><span class="level-item">一文了解</span></span><span class="level-end"><span class="level-item tag">23</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E5%AE%9E%E8%B7%B5/"><span class="level-start"><span class="level-item">技术实践</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/"><span class="level-start"><span class="level-item">技术架构</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BB%BC%E8%BF%B0/"><span class="level-start"><span class="level-item">综述</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E9%97%AE%E9%A2%98/"><span class="level-start"><span class="level-item">问题</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li></ul></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a><p class="is-size-7"><span>&copy; 2022 面向问题编程</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-CN");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/lg-zoom@1.3.0/dist/lg-zoom.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script type="text/x-mathjax-config">MathJax.Hub.Config({
+            'HTML-CSS': {
+                matchFontHeight: false
+            },
+            SVG: {
+                matchFontHeight: false
+            },
+            CommonHTML: {
+                matchFontHeight: false
+            },
+            tex2jax: {
+                inlineMath: [
+                    ['$','$'],
+                    ['\\(','\\)']
+                ]
+            }
+        });</script><script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.9/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script><!--!--><!--!--><!--!--><script src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script src="/js/insight.js" defer></script><script>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script></body></html>
