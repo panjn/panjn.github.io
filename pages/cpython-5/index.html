@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><title>谈Python的执行过程（3）：函数的实现 - 面向问题编程</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="面向问题编程"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="面向问题编程"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="从CPython源码分析python函数的实现。从内存布局角度分析python函数的执行过程。"><meta property="og:type" content="blog"><meta property="og:title" content="谈Python的执行过程（3）：函数的实现"><meta property="og:url" content="https://www.heapoverflow.cn/pages/cpython-5/"><meta property="og:site_name" content="面向问题编程"><meta property="og:description" content="从CPython源码分析python函数的实现。从内存布局角度分析python函数的执行过程。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://www.heapoverflow.cn/img/my/PyBytesObject.png"><meta property="article:published_time" content="2022-04-05T03:10:25.292Z"><meta property="article:modified_time" content="2022-04-05T03:18:07.726Z"><meta property="article:author" content="面向问题编程"><meta property="article:tag" content="CPython"><meta property="twitter:card" content="summary"><meta property="twitter:image" content="/img/my/PyBytesObject.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.heapoverflow.cn/pages/cpython-5/"},"headline":"谈Python的执行过程（3）：函数的实现","image":["https://www.heapoverflow.cn/img/my/PyBytesObject.png"],"datePublished":"2022-04-05T03:10:25.292Z","dateModified":"2022-04-05T03:18:07.726Z","author":{"@type":"Person","name":"面向问题编程"},"publisher":{"@type":"Organization","name":"面向问题编程","logo":{"@type":"ImageObject","url":"https://www.heapoverflow.cn/img/logo.svg"}},"description":"从CPython源码分析python函数的实现。从内存布局角度分析python函数的执行过程。"}</script><link rel="canonical" href="https://www.heapoverflow.cn/pages/cpython-5/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><script src="https://www.googletagmanager.com/gtag/js?id=G-ETGL163DQH" async></script><script>window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    
+        gtag('config', 'G-ETGL163DQH');</script><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><script data-ad-client="ca-pub-6757924689439593" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+          Array
+              .from(document.querySelectorAll('.tab-content'))
+              .forEach($tab => {
+                  $tab.classList.add('is-hidden');
+              });
+          Array
+              .from(document.querySelectorAll('.tabs li'))
+              .forEach($tab => {
+                  $tab.classList.remove('is-active');
+              });
+          const $activeTab = document.querySelector(location.hash);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+          const $tabMenu = document.querySelector(`a[href="${location.hash}"]`);
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 6.0.0"></head><body class="is-2-column"><nav class="navbar navbar-main"><div class="container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/categories/%E9%97%AE%E9%A2%98/">问题</a><a class="navbar-item" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/">技术架构</a><a class="navbar-item" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></div><div class="navbar-end"><a class="navbar-item" rel="noopener" title="分类" href="/categories">分类</a><a class="navbar-item" rel="noopener" title="标签" href="/tags">标签</a><a class="navbar-item" rel="noopener" title="归档" href="/archives">归档</a><a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;"><i class="fas fa-list-ul"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-9-widescreen"><div class="card"><div class="card-image"><span class="image is-7by3"><img class="fill" src="/img/my/PyBytesObject.png" alt="谈Python的执行过程（3）：函数的实现"></span></div><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-04-05T03:10:25.292Z" title="2022/4/5 上午11:10:25">2022-04-05</time>发表</span><span class="level-item"><time dateTime="2022-04-05T03:18:07.726Z" title="2022/4/5 上午11:18:07">2022-04-05</time>更新</span><span class="level-item">18 分钟读完 (大约2654个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">谈Python的执行过程（3）：函数的实现</h1><div class="content"><p>为了了解CPython是如何实现python函数，我们分析以下代码的执行过程:</p>
+<span id="more"></span>
+
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># test.py</span></span><br><span class="line">s = <span class="number">1</span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">foo</span>(<span class="params">a, b=<span class="number">2</span>, c=<span class="number">3</span></span>):</span><br><span class="line">    <span class="keyword">return</span> s+a+b+c</span><br><span class="line">foo(<span class="number">4</span>)</span><br></pre></td></tr></table></figure>
+
+<p>其字节码为：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">  <span class="number">2</span>           <span class="number">0</span> LOAD_CONST               <span class="number">0</span> (<span class="number">1</span>)</span><br><span class="line">              <span class="number">2</span> STORE_NAME               <span class="number">0</span> (s)</span><br><span class="line"></span><br><span class="line">  <span class="number">3</span>           <span class="number">4</span> LOAD_CONST               <span class="number">7</span> ((<span class="number">2</span>, <span class="number">3</span>))</span><br><span class="line">              <span class="number">6</span> LOAD_CONST               <span class="number">3</span> (&lt;code <span class="built_in">object</span> foo at <span class="number">0x7fd9e6cfc030</span>, file <span class="string">&quot;&lt;dis&gt;&quot;</span>, line <span class="number">3</span>&gt;)</span><br><span class="line">              <span class="number">8</span> LOAD_CONST               <span class="number">4</span> (<span class="string">&#x27;foo&#x27;</span>)</span><br><span class="line">             <span class="number">10</span> MAKE_FUNCTION            <span class="number">1</span> (defaults)</span><br><span class="line">             <span class="number">12</span> STORE_NAME               <span class="number">1</span> (foo)</span><br><span class="line"></span><br><span class="line">  <span class="number">5</span>          <span class="number">14</span> LOAD_NAME                <span class="number">1</span> (foo)</span><br><span class="line">             <span class="number">16</span> LOAD_CONST               <span class="number">5</span> (<span class="number">4</span>)</span><br><span class="line">             <span class="number">18</span> CALL_FUNCTION            <span class="number">1</span></span><br><span class="line">             <span class="number">20</span> POP_TOP</span><br><span class="line">             <span class="number">22</span> LOAD_CONST               <span class="number">6</span> (<span class="literal">None</span>)</span><br><span class="line">             <span class="number">24</span> RETURN_VALUE</span><br><span class="line"></span><br><span class="line">Disassembly of &lt;code <span class="built_in">object</span> foo at <span class="number">0x7fd9e6cfc030</span>, file <span class="string">&quot;&lt;dis&gt;&quot;</span>, line <span class="number">3</span>&gt;:</span><br><span class="line">  <span class="number">4</span>           <span class="number">0</span> LOAD_GLOBAL              <span class="number">0</span> (s)</span><br><span class="line">              <span class="number">2</span> LOAD_FAST                <span class="number">0</span> (a)</span><br><span class="line">              <span class="number">4</span> BINARY_ADD</span><br><span class="line">              <span class="number">6</span> LOAD_FAST                <span class="number">1</span> (b)</span><br><span class="line">              <span class="number">8</span> BINARY_ADD</span><br><span class="line">             <span class="number">10</span> LOAD_FAST                <span class="number">2</span> (c)</span><br><span class="line">             <span class="number">12</span> BINARY_ADD</span><br><span class="line">             <span class="number">14</span> RETURN_VALUE</span><br></pre></td></tr></table></figure>
+
+<p>在之前的两篇文章中，我们已经知道LOAD_CONST, STORE_NAME这些指令在做些啥。我们用gdb逐行分析以上字节码。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">(gdb) <span class="built_in">set</span> args test.py</span><br><span class="line">(gdb) b <span class="title function_">run_mod</span></span><br><span class="line"><span class="params">(gdb)</span> <span class="title function_">r</span></span><br><span class="line"><span class="params">(gdb)</span> b _<span class="title function_">PyEval_EvalFrameDefault</span></span><br><span class="line"><span class="params">(gdb)</span> <span class="title function_">c</span></span><br><span class="line"><span class="params">(gdb)</span> source /home/panjianning/Python-3.7.0/python-gdb.<span class="title function_">py</span></span><br><span class="line"><span class="params">(gdb)</span> p f</span><br><span class="line">$7 = Frame <span class="number">0x9a0ab8</span>, <span class="keyword">for</span> file test.py, line <span class="number">1</span>, in &lt;module&gt; ()</span><br><span class="line">(gdb) p f-&gt;f_valuestack</span><br><span class="line">$<span class="number">8</span> = (PyObject **) <span class="number">0x9a0c30</span></span><br><span class="line">(gdb) p *f-&gt;f_valuestack</span><br><span class="line">$<span class="number">9</span> = <span class="number">0x0</span></span><br><span class="line">(gdb) p f-&gt;f_stacktop</span><br><span class="line">$<span class="number">13</span> = (PyObject **) <span class="number">0x9a0c30</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="从-PyEval-EvalFrameDefault开始"><a href="#从-PyEval-EvalFrameDefault开始" class="headerlink" title="从_PyEval_EvalFrameDefault开始"></a>从<code>_PyEval_EvalFrameDefault</code>开始</h2><p>我们主要关注执行过程中以下变量，下面是进入_PyEval_EvalFrameDefault后，在取指(switch opcode)执行之前它们的值：</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>变量</th>
+<th>值</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PyFrameObject*</td>
+<td>f</td>
+<td>0x9a0ab8</td>
+<td>帧对象</td>
+</tr>
+<tr>
+<td>PyObject**</td>
+<td>f-&gt;f_valuestack</td>
+<td>0x9a0c30</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject*</td>
+<td>*f-&gt;f_valuestack</td>
+<td>0x00</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject*</td>
+<td>f-&gt;f_stacktop</td>
+<td>0x9a0c30</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject**</td>
+<td>stack_pointer</td>
+<td>0x9a0c30</td>
+<td>_PyEval_EvalFrameDefault的局部变量，初始化为f-&gt;stacktop, <strong>然后将f-&gt;f_stacktop设为0x0</strong></td>
+</tr>
+<tr>
+<td>PyObject []</td>
+<td>(**f-&gt;f_valuestack, …,  **(stack_pointer–))</td>
+<td>()</td>
+<td>求值栈上的值</td>
+</tr>
+<tr>
+<td>PyCodeObject*</td>
+<td>f-&gt;f_co_code</td>
+<td>0x7ffff6fd3640</td>
+<td>字节码对象</td>
+</tr>
+<tr>
+<td>PyTupleObject*</td>
+<td>f-&gt;f_code-&gt;co_consts</td>
+<td>(1, 2, 3, &lt;code at remote 0x7ffff6fdbf40&gt;, ‘foo’, 4, None, (2, 3))</td>
+<td></td>
+</tr>
+<tr>
+<td>PyTupleObject*</td>
+<td>f-&gt;f_code-&gt;co_names</td>
+<td>(‘s’, ‘foo’)</td>
+<td></td>
+</tr>
+<tr>
+<td>PyDictObject*</td>
+<td>f-&gt;f_locals</td>
+<td>{…}</td>
+<td>有点长，不显示</td>
+</tr>
+<tr>
+<td>PyDictObject*</td>
+<td>f-&gt;f_globals</td>
+<td>{…}</td>
+<td>实际上，对这里而言，f_globals和f_locals指向的是同一个地址</td>
+</tr>
+</tbody></table>
+<p>值得一提的是，这里调用_PyEval_EvalFrameDefault时，f-&gt;f_stacktop一开始是0x9a0c30，但在取指令执行前，会将f_stacktop赋值给stack_pointer后，
+然后将f_stacktop设为0x0。</p>
+<h2 id="LOAD-CONST指令"><a href="#LOAD-CONST指令" class="headerlink" title="LOAD CONST指令"></a>LOAD CONST指令</h2><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">2</span>           <span class="number">0</span> LOAD_CONST               <span class="number">0</span> (<span class="number">1</span>)</span><br></pre></td></tr></table></figure>
+
+<p>PUSH时，frame的成员变量f_stacktop不会变，实际是用局部变量stack_pointer来表示栈顶。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">#define BASIC_PUSH(v)     (*stack_pointer++ = (v))</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>变量</th>
+<th>值</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PyFrameObject*</td>
+<td>f</td>
+<td>0x9a0ab8</td>
+<td>帧对象</td>
+</tr>
+<tr>
+<td>PyObject**</td>
+<td>f-&gt;f_valuestack</td>
+<td>0x9a0c30</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject*</td>
+<td>*f-&gt;f_valuestack</td>
+<td>0x91bba0</td>
+<td>0x91bba0地址处是PyLongObject 1 (来自f-&gt;f_code-&gt;co_consts的第一个元素)</td>
+</tr>
+<tr>
+<td>PyObject*</td>
+<td>f-&gt;f_stacktop</td>
+<td>0x00</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject**</td>
+<td>stack_pointer</td>
+<td>0x9a0c38</td>
+<td>PUSH一个PyObject*到f_valuestack, stack_pointer+&#x3D;0x8</td>
+</tr>
+<tr>
+<td>PyObject []</td>
+<td>(**f-&gt;f_valuestack, …,  **(stack_pointer–))</td>
+<td>(1, )</td>
+<td>求值栈上的值</td>
+</tr>
+<tr>
+<td>PyDictObject*</td>
+<td>f-&gt;f_locals</td>
+<td>{…}</td>
+<td></td>
+</tr>
+<tr>
+<td>PyDictObject*</td>
+<td>f-&gt;f_globals</td>
+<td>{…}</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2 id="STORE-NAME-指令"><a href="#STORE-NAME-指令" class="headerlink" title="STORE_NAME 指令"></a>STORE_NAME 指令</h2><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">2</span> STORE_NAME               <span class="number">0</span> (s)</span><br></pre></td></tr></table></figure>
+
+<p>POP时只是单纯地将stack_pointer减小一个单位。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">#define BASIC_POP()       (*--stack_pointer)</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>变量</th>
+<th>值</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PyFrameObject*</td>
+<td>f</td>
+<td>0x9a0ab8</td>
+<td>帧对象</td>
+</tr>
+<tr>
+<td>PyObject**</td>
+<td>f-&gt;f_valuestack</td>
+<td>0x9a0c30</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject*</td>
+<td>*f-&gt;f_valuestack</td>
+<td>0x91bba0</td>
+<td>0x91bba0地址处是PyLongObject 1 (来自f-&gt;f_code-&gt;co_consts的第一个元素)</td>
+</tr>
+<tr>
+<td>PyObject*</td>
+<td>f-&gt;f_stacktop</td>
+<td>0x00</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject**</td>
+<td>stack_pointer</td>
+<td>0x9a0c30</td>
+<td>PUSH一个PyObject*到f_valuestack, stack_pointer+&#x3D;0x8</td>
+</tr>
+<tr>
+<td>PyObject []</td>
+<td>(**f-&gt;f_valuestack, …,  **(stack_pointer–))</td>
+<td>()</td>
+<td>求值栈上的值</td>
+</tr>
+<tr>
+<td>PyDictObject*</td>
+<td>f-&gt;f_locals</td>
+<td>{…, ‘s’: 1}</td>
+<td></td>
+</tr>
+<tr>
+<td>PyDictObject*</td>
+<td>f-&gt;f_globals</td>
+<td>{…}</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2 id="将MAKE-FUNCTION指令需要的参数入栈"><a href="#将MAKE-FUNCTION指令需要的参数入栈" class="headerlink" title="将MAKE FUNCTION指令需要的参数入栈"></a>将MAKE FUNCTION指令需要的参数入栈</h2><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">3</span>           <span class="number">4</span> LOAD_CONST               <span class="number">7</span> ((<span class="number">2</span>, <span class="number">3</span>))</span><br><span class="line">            <span class="number">6</span> LOAD_CONST               <span class="number">3</span> (&lt;code <span class="built_in">object</span> foo at <span class="number">0x7fd9e6cfc030</span>, file <span class="string">&quot;&lt;dis&gt;&quot;</span>, line <span class="number">3</span>&gt;)</span><br><span class="line">            <span class="number">8</span> LOAD_CONST               <span class="number">4</span> (<span class="string">&#x27;foo&#x27;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>三个consts指令，注意第二条指令，实际上co_consts里的元素可能是PyCodeObject*, 这里是foo函数体对应的字节码，可以看本文开头的字节码。</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>变量</th>
+<th>值</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PyFrameObject*</td>
+<td>f</td>
+<td>0x9a0ab8</td>
+<td>帧对象</td>
+</tr>
+<tr>
+<td>PyObject**</td>
+<td>f-&gt;f_valuestack</td>
+<td>0x9a0c30</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject*</td>
+<td>*f-&gt;f_valuestack及往后三个字节的值</td>
+<td>0x7ffff6f172f8, 0x7ffff6fdbf40，0x7ffff6f0d5f0</td>
+<td>这三个地址处的值分别为(2,4)，PyCodeObject foo,  ‘foo’</td>
+</tr>
+<tr>
+<td>PyObject*</td>
+<td>f-&gt;f_stacktop</td>
+<td>0x00</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject**</td>
+<td>stack_pointer</td>
+<td>0x9a0c48</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject []</td>
+<td>(**f-&gt;f_valuestack, …,  **(stack_pointer–))</td>
+<td>((2,4), PyCodeObject foo,  ‘foo’)</td>
+<td>求值栈上的值</td>
+</tr>
+<tr>
+<td>PyDictObject*</td>
+<td>f-&gt;f_locals</td>
+<td>{…, ‘s’: 1}</td>
+<td></td>
+</tr>
+<tr>
+<td>PyDictObject*</td>
+<td>f-&gt;f_globals</td>
+<td>{…}</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2 id="MAKE-FUNCTION指令"><a href="#MAKE-FUNCTION指令" class="headerlink" title="MAKE FUNCTION指令"></a>MAKE FUNCTION指令</h2><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">10</span> MAKE_FUNCTION            <span class="number">1</span> (defaults)</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>根据源码，我们是从求值栈中pop出函数名foo, 和代码对象foo, 然后通过<code>PyFunction_NewWithQualName(codeobj, f-&gt;f_globals, qualname)</code>构造了
+一个PyFunctionObject对象func。 根据指令操作数oparg&#x3D;1，从求值栈中将(2, 3)pop出来，令<code>func-&gt;func_defaults=(2,3)</code>。 
+PyFunction_NewWithQualName里，<code>func-&gt;func_globals</code>会设为f-&gt;f_globals
+最后将函数对象func push到求值栈。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line">TARGET(MAKE_FUNCTION) &#123;</span><br><span class="line">    PyObject *qualname = POP();</span><br><span class="line">    PyObject *codeobj = POP();</span><br><span class="line">    PyFunctionObject *func = (PyFunctionObject *)</span><br><span class="line">        PyFunction_NewWithQualName(codeobj, f-&gt;f_globals, qualname);</span><br><span class="line"></span><br><span class="line">    Py_DECREF(codeobj);</span><br><span class="line">    Py_DECREF(qualname);</span><br><span class="line">    <span class="keyword">if</span> (func == <span class="literal">NULL</span>) &#123;</span><br><span class="line">        <span class="keyword">goto</span> error;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (oparg &amp; <span class="number">0x08</span>) &#123;</span><br><span class="line">        assert(PyTuple_CheckExact(TOP()));</span><br><span class="line">        func -&gt;func_closure = POP();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (oparg &amp; <span class="number">0x04</span>) &#123;</span><br><span class="line">        assert(PyDict_CheckExact(TOP()));</span><br><span class="line">        func-&gt;func_annotations = POP();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (oparg &amp; <span class="number">0x02</span>) &#123;</span><br><span class="line">        assert(PyDict_CheckExact(TOP()));</span><br><span class="line">        func-&gt;func_kwdefaults = POP();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (oparg &amp; <span class="number">0x01</span>) &#123;</span><br><span class="line">        assert(PyTuple_CheckExact(TOP()));</span><br><span class="line">        func-&gt;func_defaults = POP();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    PUSH((PyObject *)func);</span><br><span class="line">    DISPATCH();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>变量</th>
+<th>值</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PyFrameObject*</td>
+<td>f</td>
+<td>0x9a0ab8</td>
+<td>帧对象</td>
+</tr>
+<tr>
+<td>PyObject**</td>
+<td>f-&gt;f_valuestack</td>
+<td>0x9a0c30</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject*</td>
+<td>*f-&gt;f_valuestack</td>
+<td>0x7ffff6f2b058</td>
+<td>这地址处的值分别为PyFunctionObject foo</td>
+</tr>
+<tr>
+<td>PyObject*</td>
+<td>f-&gt;f_stacktop</td>
+<td>0x00</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject**</td>
+<td>stack_pointer</td>
+<td>0x9a0c38</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject []</td>
+<td>(**f-&gt;f_valuestack, …,  **(stack_pointer–))</td>
+<td>(PyFunctionObject foo, )</td>
+<td>求值栈上的值</td>
+</tr>
+<tr>
+<td>PyDictObject*</td>
+<td>f-&gt;f_locals</td>
+<td>{…, ‘s’: 1}</td>
+<td></td>
+</tr>
+<tr>
+<td>PyDictObject*</td>
+<td>f-&gt;f_globals</td>
+<td>{…}</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2 id="将PyFunctionObject放到局部变量表"><a href="#将PyFunctionObject放到局部变量表" class="headerlink" title="将PyFunctionObject放到局部变量表"></a>将PyFunctionObject放到局部变量表</h2><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">12</span> STORE_NAME               <span class="number">1</span> (foo)</span><br></pre></td></tr></table></figure>
+<p>显然，这个指令会将’foo’&#x3D;func放到f_locals</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>变量</th>
+<th>值</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PyFrameObject*</td>
+<td>f</td>
+<td>0x9a0ab8</td>
+<td>帧对象</td>
+</tr>
+<tr>
+<td>PyObject**</td>
+<td>f-&gt;f_valuestack</td>
+<td>0x9a0c30</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject*</td>
+<td>*f-&gt;f_valuestack</td>
+<td>0x7ffff6f2b058</td>
+<td>这地址处的值分别为PyFunctionObject foo</td>
+</tr>
+<tr>
+<td>PyObject*</td>
+<td>f-&gt;f_stacktop</td>
+<td>0x00</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject**</td>
+<td>stack_pointer</td>
+<td>0x9a0c30</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject []</td>
+<td>(**f-&gt;f_valuestack, …,  **(stack_pointer–))</td>
+<td>()</td>
+<td>求值栈上的值</td>
+</tr>
+<tr>
+<td>PyDictObject*</td>
+<td>f-&gt;f_locals</td>
+<td>{…, ‘s’: 1, ‘foo’: &lt;function at remote 0x7ffff6f2b058&gt;}</td>
+<td></td>
+</tr>
+<tr>
+<td>PyDictObject*</td>
+<td>f-&gt;f_globals</td>
+<td>{…}</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2 id="LOAD-NAME指令"><a href="#LOAD-NAME指令" class="headerlink" title="LOAD_NAME指令"></a>LOAD_NAME指令</h2><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">5</span>          <span class="number">14</span> LOAD_NAME                <span class="number">1</span> (foo)</span><br></pre></td></tr></table></figure>
+
+<p>LOAD_NAME指令会先后尝试从f-&gt;f_locals, f-&gt;globals, f-&gt;builtins里找到’foo’, 这里我们的<code>foo</code>在f-&gt;f_locals中。
+找到后将其push到valuestack。</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>变量</th>
+<th>值</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PyFrameObject*</td>
+<td>f</td>
+<td>0x9a0ab8</td>
+<td>帧对象</td>
+</tr>
+<tr>
+<td>PyObject**</td>
+<td>f-&gt;f_valuestack</td>
+<td>0x9a0c30</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject*</td>
+<td>*f-&gt;f_valuestack</td>
+<td>0x7ffff6f2b058</td>
+<td>这地址处的值分别为PyFunctionObject foo</td>
+</tr>
+<tr>
+<td>PyObject*</td>
+<td>f-&gt;f_stacktop</td>
+<td>0x00</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject**</td>
+<td>stack_pointer</td>
+<td>0x9a0c38</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject []</td>
+<td>(**f-&gt;f_valuestack, …,  **(stack_pointer–))</td>
+<td>(PyFunctionObject foo， )</td>
+<td>求值栈上的值</td>
+</tr>
+<tr>
+<td>PyDictObject*</td>
+<td>f-&gt;f_locals</td>
+<td>{…, ‘s’: 1, ‘foo’: &lt;function at remote 0x7ffff6f2b058&gt;}</td>
+<td></td>
+</tr>
+<tr>
+<td>PyDictObject*</td>
+<td>f-&gt;f_globals</td>
+<td>{…}</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2 id="将实参push到栈上"><a href="#将实参push到栈上" class="headerlink" title="将实参push到栈上"></a>将实参push到栈上</h2><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">16</span> LOAD_CONST               <span class="number">5</span> (<span class="number">4</span>)</span><br></pre></td></tr></table></figure>
+
+<p>将4 push到valuestack</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>变量</th>
+<th>值</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PyFrameObject*</td>
+<td>f</td>
+<td>0x9a0ab8</td>
+<td>帧对象</td>
+</tr>
+<tr>
+<td>PyObject**</td>
+<td>f-&gt;f_valuestack</td>
+<td>0x9a0c30</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject*</td>
+<td>*f-&gt;f_valuestack及往后两个字节的值</td>
+<td>0x7ffff6f2b058, 0x91bc30</td>
+<td>这地址处的值分别为PyFunctionObject foo, PyLongObject 4</td>
+</tr>
+<tr>
+<td>PyObject*</td>
+<td>f-&gt;f_stacktop</td>
+<td>0x00</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject**</td>
+<td>stack_pointer</td>
+<td>0x9a0c40</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject []</td>
+<td>(**f-&gt;f_valuestack, …,  **(stack_pointer–))</td>
+<td>(PyFunctionObject foo， 4)</td>
+<td>求值栈上的值</td>
+</tr>
+<tr>
+<td>PyDictObject*</td>
+<td>f-&gt;f_locals</td>
+<td>{…, ‘s’: 1, ‘foo’: &lt;function at remote 0x7ffff6f2b058&gt;}</td>
+<td></td>
+</tr>
+<tr>
+<td>PyDictObject*</td>
+<td>f-&gt;f_globals</td>
+<td>{…}</td>
+<td></td>
+</tr>
+</tbody></table>
+<p>所以这里的python参数传递做了啥？ 其实只是将f-&gt;f_code-&gt;co_consts里的指向4这个PyLongObject的指针拷贝到了求值栈上。</p>
+<p>所以当别人问你python是按引用传递还是按值传递时，你可以说是按值传递，不过这个值是指针。</p>
+<h2 id="CALL-FUNCTION指令"><a href="#CALL-FUNCTION指令" class="headerlink" title="CALL FUNCTION指令"></a>CALL FUNCTION指令</h2><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line">    TARGET(CALL_FUNCTION) &#123;</span><br><span class="line">        PyObject **sp, *res;</span><br><span class="line">        sp = stack_pointer;</span><br><span class="line">        res = call_function(&amp;sp, oparg, <span class="literal">NULL</span>);</span><br><span class="line">        stack_pointer = sp;</span><br><span class="line">        PUSH(res);</span><br><span class="line">        <span class="keyword">if</span> (res == <span class="literal">NULL</span>) &#123;</span><br><span class="line">            <span class="keyword">goto</span> error;</span><br><span class="line">        &#125;</span><br><span class="line">        DISPATCH();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">Py_LOCAL_INLINE(PyObject *) _Py_HOT_FUNCTION</span><br><span class="line"><span class="title function_">call_function</span><span class="params">(PyObject ***pp_stack, Py_ssize_t oparg, PyObject *kwnames)</span></span><br><span class="line">&#123;</span><br><span class="line">    PyObject **pfunc = (*pp_stack) - oparg - <span class="number">1</span>;</span><br><span class="line">    PyObject *func = *pfunc;</span><br><span class="line">    PyObject *x, *w;</span><br><span class="line">    Py_ssize_t nkwargs = (kwnames == <span class="literal">NULL</span>) ? <span class="number">0</span> : PyTuple_GET_SIZE(kwnames);</span><br><span class="line">    Py_ssize_t nargs = oparg - nkwargs;</span><br><span class="line">    PyObject **<span class="built_in">stack</span> = (*pp_stack) - nargs - nkwargs;</span><br><span class="line"></span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">if</span> (PyFunction_Check(func)) &#123;</span><br><span class="line">            x = _PyFunction_FastCallKeywords(func, <span class="built_in">stack</span>, nargs, kwnames);</span><br><span class="line">        &#125;</span><br><span class="line">    ...</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* Clear the stack of the function object. */</span></span><br><span class="line">    <span class="keyword">while</span> ((*pp_stack) &gt; pfunc) &#123;</span><br><span class="line">        w = EXT_POP(*pp_stack);</span><br><span class="line">        Py_DECREF(w);</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="call-function函数"><a href="#call-function函数" class="headerlink" title="call_function函数"></a>call_function函数</h3><ul>
+<li>这里我们会进入call_function函数，<code>func = *pfunc = *(**stack_pointer-1-1)</code>, func指向f_valuestack上的PyFunctionObject指针foo。
+<code>PyObject **stack = (*pp_stack) - 1 - 0 = 0x9a0c38</code> , <strong>stack往后nargs个字节都是func的调用位置实参的指针</strong></li>
+<li>call_function退出前，会减小sp指针(同时sp是指针传递)，当退出call_function时，sp的值为0x9a0c30，stack_pointer&#x3D;sp使得stack_pointer的值
+也变为0x9a0c30。如此执行完CALL FUNCTION指令，valuestack中的foo函数对象和参数4便被pop出了栈。</li>
+</ul>
+<h3 id="PyFunction-FastCallKeywords函数"><a href="#PyFunction-FastCallKeywords函数" class="headerlink" title="_PyFunction_FastCallKeywords函数"></a>_PyFunction_FastCallKeywords函数</h3><p>在call_function里，经过一些列条件语句判断，我们会进入_PyFunction_FastCallKeywords函数。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">_PyFunction_FastCallKeywords (func=func@entry=&lt;function at remote 0x7ffff6f2b058&gt;, stack=stack@entry=0x9a0c38,</span><br><span class="line">    nargs=nargs@entry=1, kwnames=kwnames@entry=0x0) at Objects/call.c:388</span><br></pre></td></tr></table></figure>
+
+<p>调用_PyFunction_FastCallKeywords时，传进来的函数对象func是这样的：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">(gdb) p *(PyFunctionObject*)func</span><br><span class="line">$<span class="number">104</span> = &#123;ob_base = &#123;_ob_next = <span class="number">0x9a0ab8</span>, _ob_prev = <span class="number">0x8c3120</span> &lt;refchain&gt;, ob_refcnt = <span class="number">3</span>,</span><br><span class="line">    ob_type = <span class="number">0x8bd520</span> &lt;PyFunction_Type&gt;&#125;, func_code = &lt;code at remote <span class="number">0x7ffff6fdbf40</span>&gt;,</span><br><span class="line">  func_globals = &#123;<span class="string">&#x27;__name__&#x27;</span>: <span class="string">&#x27;__main__&#x27;</span>, <span class="string">&#x27;__doc__&#x27;</span>: None, <span class="string">&#x27;__package__&#x27;</span>: None, <span class="string">&#x27;__loader__&#x27;</span>: &lt;SourceFileLoader(name=<span class="string">&#x27;__main__&#x27;</span>, path=<span class="string">&#x27;test.py&#x27;</span>) at remote <span class="number">0x7ffff6f0d538</span>&gt;, <span class="string">&#x27;__spec__&#x27;</span>: None, <span class="string">&#x27;__annotations__&#x27;</span>: &#123;&#125;, <span class="string">&#x27;__builtins__&#x27;</span>: &lt;module at remote <span class="number">0x7ffff70be6d8</span>&gt;, <span class="string">&#x27;__file__&#x27;</span>: <span class="string">&#x27;test.py&#x27;</span>, <span class="string">&#x27;__cached__&#x27;</span>: None, <span class="string">&#x27;s&#x27;</span>: <span class="number">1</span>, <span class="string">&#x27;foo&#x27;</span>: &lt;function at remote <span class="number">0x7ffff6f2b058</span>&gt;&#125;, func_defaults = (<span class="number">2</span>, <span class="number">3</span>), func_kwdefaults = <span class="number">0x0</span>, func_closure = <span class="number">0x0</span>, func_doc = None, func_name = <span class="string">&#x27;foo&#x27;</span>,</span><br><span class="line">  func_dict = <span class="number">0x0</span>, func_weakreflist = <span class="number">0x0</span>, func_module = <span class="string">&#x27;__main__&#x27;</span>, func_annotations = <span class="number">0x0</span>, func_qualname = <span class="string">&#x27;foo&#x27;</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p><a target="_blank" rel="noopener" href="https://github.com/python/cpython/blob/3.7/Objects/call.c#L386">_PyFunction_FastCallKeywords</a>函数的定义：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">PyObject *</span><br><span class="line">_PyFunction_FastCallKeywords(PyObject *func, PyObject *<span class="type">const</span> *<span class="built_in">stack</span>,</span><br><span class="line">                             Py_ssize_t nargs, PyObject *kwnames)</span><br><span class="line">&#123;</span><br><span class="line">    PyCodeObject *co = (PyCodeObject *)PyFunction_GET_CODE(func);</span><br><span class="line">    PyObject *globals = PyFunction_GET_GLOBALS(func);</span><br><span class="line">    PyObject *argdefs = PyFunction_GET_DEFAULTS(func);</span><br><span class="line">    PyObject *kwdefs, *closure, *name, *qualname;</span><br><span class="line">    PyObject **d;</span><br><span class="line">    Py_ssize_t nkwargs = (kwnames == <span class="literal">NULL</span>) ? <span class="number">0</span> : PyTuple_GET_SIZE(kwnames);</span><br><span class="line">    Py_ssize_t nd;</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">return</span> _PyEval_EvalCodeWithName((PyObject*)co, globals, (PyObject *)<span class="literal">NULL</span>,</span><br><span class="line">                                    <span class="built_in">stack</span>, nargs,</span><br><span class="line">                                    nkwargs ? &amp;PyTuple_GET_ITEM(kwnames, <span class="number">0</span>) : <span class="literal">NULL</span>,</span><br><span class="line">                                    <span class="built_in">stack</span> + nargs,</span><br><span class="line">                                    nkwargs, <span class="number">1</span>,</span><br><span class="line">                                    d, (<span class="type">int</span>)nd, kwdefs,</span><br><span class="line">                                    closure, name, qualname);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>上面代码中：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">globals = func-&gt;func_globals</span><br><span class="line">argdefs = func-&gt;func_defaults # (<span class="number">2</span>, <span class="number">3</span>)</span><br></pre></td></tr></table></figure>
+
+<p>注意前面说过，<strong>stack往后nargs个字节都是func的调用位置实参的指针</strong>，调用_PyEval_EvalCodeWithName时，
+_PyEval_EvalCodeWithName参数&#x3D;stack, <strong>可以根据args和nargs拿到foo的位置实参。 上面的d（defs）是默认参数(2,3)</strong></p>
+<p>最终又跑到_PyEval_EvalCodeWithName</p>
+<h2 id="PyEval-EvalCodeWithName"><a href="#PyEval-EvalCodeWithName" class="headerlink" title="_PyEval_EvalCodeWithName"></a><code>_PyEval_EvalCodeWithName</code></h2><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">_PyEval_EvalCodeWithName (_co=&lt;code at remote <span class="number">0x7ffff6fdbf40</span>&gt;,</span><br><span class="line">    globals=&#123;<span class="string">&#x27;__name__&#x27;</span>: <span class="string">&#x27;__main__&#x27;</span>, <span class="string">&#x27;__doc__&#x27;</span>: None, <span class="string">&#x27;__package__&#x27;</span>: None, <span class="string">&#x27;__loader__&#x27;</span>: &lt;SourceFileLoader(name=<span class="string">&#x27;__main__&#x27;</span>, path=<span class="string">&#x27;test.py&#x27;</span>) at remote <span class="number">0x7ffff6f0d538</span>&gt;, <span class="string">&#x27;__spec__&#x27;</span>: None, <span class="string">&#x27;__annotations__&#x27;</span>: &#123;&#125;, <span class="string">&#x27;__builtins__&#x27;</span>: &lt;module at remote <span class="number">0x7ffff70be6d8</span>&gt;, <span class="string">&#x27;__file__&#x27;</span>: <span class="string">&#x27;test.py&#x27;</span>, <span class="string">&#x27;__cached__&#x27;</span>: None, <span class="string">&#x27;s&#x27;</span>: <span class="number">1</span>, <span class="string">&#x27;foo&#x27;</span>: &lt;function at remote <span class="number">0x7ffff6f2b058</span>&gt;&#125;, </span><br><span class="line">    locals=locals@entry=<span class="number">0x0</span>, args=args@entry=<span class="number">0x9a0c38</span>, argcount=<span class="number">1</span>, kwnames=<span class="number">0x0</span>, kwargs=<span class="number">0x9a0c40</span>, kwcount=<span class="number">0</span>,</span><br><span class="line">    kwstep=<span class="number">1</span>, defs=<span class="number">0x7ffff6f17320</span>, defcount=<span class="number">2</span>, kwdefs=<span class="number">0x0</span>, closure=<span class="number">0x0</span>, name=<span class="string">&#x27;foo&#x27;</span>, qualname=<span class="string">&#x27;foo&#x27;</span>)</span><br><span class="line">    at Python/ceval.c:<span class="number">3664</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="新的PyFrameObject"><a href="#新的PyFrameObject" class="headerlink" title="新的PyFrameObject"></a>新的PyFrameObject</h3><p>回顾上文，我们调用函数foo前有一个帧：</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>变量</th>
+<th>值</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PyFrameObject*</td>
+<td>f</td>
+<td>0x9a0ab8</td>
+<td>帧对象</td>
+</tr>
+<tr>
+<td>PyObject**</td>
+<td>f-&gt;f_valuestack</td>
+<td>0x9a0c30</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject*</td>
+<td>*f-&gt;f_valuestack及往后两个字节的值</td>
+<td>0x7ffff6f2b058, 0x91bc30</td>
+<td>这地址处的值分别为PyFunctionObject foo, PyLongObject 4</td>
+</tr>
+<tr>
+<td>PyObject*</td>
+<td>f-&gt;f_stacktop</td>
+<td>0x00</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject**</td>
+<td>stack_pointer</td>
+<td>0x9a0c40</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject []</td>
+<td>(**f-&gt;f_valuestack, …,  **(stack_pointer–))</td>
+<td>(PyFunctionObject foo， 4)</td>
+<td>求值栈上的值</td>
+</tr>
+<tr>
+<td>PyDictObject*</td>
+<td>f-&gt;f_locals</td>
+<td>{…, ‘s’: 1, ‘foo’: &lt;function at remote 0x7ffff6f2b058&gt;}</td>
+<td></td>
+</tr>
+<tr>
+<td>PyDictObject*</td>
+<td>f-&gt;f_globals</td>
+<td>{…}</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><a target="_blank" rel="noopener" href="https://github.com/python/cpython/blob/3.7/Python/ceval.c#L3691">_PyEval_EvalCodeWithName</a>里会创建新的PyFrameObject:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* Create the frame */</span></span><br><span class="line">tstate = PyThreadState_GET();</span><br><span class="line">assert(tstate != <span class="literal">NULL</span>);</span><br><span class="line">f = _PyFrame_New_NoTrack(tstate, co, globals, locals);</span><br></pre></td></tr></table></figure>
+
+<p>它的值是这样的：</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>变量</th>
+<th>值</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PyFrameObject*</td>
+<td>f</td>
+<td>0x9a0da8</td>
+<td>帧对象</td>
+</tr>
+<tr>
+<td>PyFrameObject*</td>
+<td>f-&gt;f_back</td>
+<td>0x9a0ab8</td>
+<td>指向上一个帧</td>
+</tr>
+<tr>
+<td>PyObject**</td>
+<td>f-&gt;f_valuestack</td>
+<td>0x9a0f38</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject*</td>
+<td>f-&gt;f_stacktop</td>
+<td>0x9a0f38</td>
+<td></td>
+</tr>
+<tr>
+<td>PyDictObject*</td>
+<td>f-&gt;f_locals</td>
+<td>{…}</td>
+<td></td>
+</tr>
+<tr>
+<td>PyDictObject*</td>
+<td>f-&gt;f_globals</td>
+<td>{…, ‘s’: 1, ‘foo’: &lt;function at remote 0x7ffff6f2b058&gt;}</td>
+<td></td>
+</tr>
+<tr>
+<td>PyObject*</td>
+<td>f-&gt;f_localsplus</td>
+<td>0x9a0f20</td>
+<td>fastlocals</td>
+</tr>
+</tbody></table>
+<h3 id="将位置参数和默认参数放到fastlocals"><a href="#将位置参数和默认参数放到fastlocals" class="headerlink" title="将位置参数和默认参数放到fastlocals"></a>将位置参数和默认参数放到fastlocals</h3><p><a target="_blank" rel="noopener" href="https://github.com/python/cpython/blob/3.7/Python/ceval.c#L3720">PyEval_EvalCodeWithName的这里</a>
+，args指向valuestack中调用参数的开始地址0x9a0f38，执行完下面的循环后，fastlocals处第一个值为对PyLongObject 4的指针。
+后面执行函数体里的LOAD FAST指令会从这里LOAD</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">fastlocals = f-&gt;f_localsplus;</span><br><span class="line">...</span><br><span class="line"><span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; n; i++) &#123;</span><br><span class="line">    x = args[i];</span><br><span class="line">    Py_INCREF(x);</span><br><span class="line">    SETLOCAL(i, x);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>接着默认参数2和3也会被拷贝到fastlocals开始第二个字节和第三个字节。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">(gdb) x /<span class="number">3</span>g fastlocals</span><br><span class="line"><span class="number">0x9a0f20</span>:       <span class="number">0x000000000091bc30</span>      <span class="number">0x000000000091bbd0</span></span><br><span class="line"><span class="number">0x9a0f30</span>:       <span class="number">0x000000000091bc00</span></span><br><span class="line">(gdb) p fastlocals</span><br><span class="line">$<span class="number">133</span> = (PyObject **) <span class="number">0x9a0f20</span></span><br><span class="line">(gdb) p *fastlocals</span><br><span class="line">$<span class="number">134</span> = <span class="number">4</span></span><br><span class="line">(gdb) p *(fastlocals+<span class="number">1</span>)</span><br><span class="line">$<span class="number">136</span> = <span class="number">2</span></span><br><span class="line">(gdb) p *(fastlocals+<span class="number">2</span>)</span><br><span class="line">$<span class="number">137</span> = <span class="number">3</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="执行函数体"><a href="#执行函数体" class="headerlink" title="执行函数体"></a>执行函数体</h2><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">4</span>           <span class="number">0</span> LOAD_GLOBAL              <span class="number">0</span> (s)</span><br><span class="line">            <span class="number">2</span> LOAD_FAST                <span class="number">0</span> (a)</span><br><span class="line">            <span class="number">4</span> BINARY_ADD</span><br><span class="line">            <span class="number">6</span> LOAD_FAST                <span class="number">1</span> (b)</span><br><span class="line">            <span class="number">8</span> BINARY_ADD</span><br><span class="line">           <span class="number">10</span> LOAD_FAST                <span class="number">2</span> (c)</span><br><span class="line">           <span class="number">12</span> BINARY_ADD</span><br><span class="line">           <span class="number">14</span> RETURN_VALUE</span><br></pre></td></tr></table></figure>
+<p>这里就没什么好解释的了，比如LOAD_GLOBAL从f-&gt;f_globals里取变量的值压倒栈，LOAD_FAST从fastlocals取变量的值压到栈等。</p>
+</div><div class="article-licensing box"><div class="licensing-title"><p>谈Python的执行过程（3）：函数的实现</p><p><a href="https://www.heapoverflow.cn/pages/cpython-5/">https://www.heapoverflow.cn/pages/cpython-5/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>面向问题编程</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2022-04-05</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2022-04-05</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/CPython/">CPython</a></div><!--!--><div><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6757924689439593" crossOrigin="anonymous"></script><ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-6757924689439593" data-ad-slot="2352785969"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div></article></div><!--!--><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/pages/python-async/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">Python异步编程：从多线程到协程</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/pages/cpython-4/"><span class="level-item">谈Python的执行过程（2）：字节码的执行</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--><div style="width:100%"><script src="https://giscus.app/client.js" data-repo="thetechstack/thetechstack.github.io" data-repo-id="R_kgDOG6Ti1Q" data-category="Announcements" data-category-id="DIC_kwDOG6Ti1c4COQtm" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light" data-lang="zh-CN" crossOrigin="anonymous" async></script></div></div><!--!--><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen  order-3 is-sticky"><div class="card widget" id="toc" data-type="toc"><div class="card-content"><div class="menu"><h3 class="menu-label">目录</h3><ul class="menu-list"><li><a class="level is-mobile" href="#从-PyEval-EvalFrameDefault开始"><span class="level-left"><span class="level-item">1</span><span class="level-item">从_PyEval_EvalFrameDefault开始</span></span></a></li><li><a class="level is-mobile" href="#LOAD-CONST指令"><span class="level-left"><span class="level-item">2</span><span class="level-item">LOAD CONST指令</span></span></a></li><li><a class="level is-mobile" href="#STORE-NAME-指令"><span class="level-left"><span class="level-item">3</span><span class="level-item">STORE_NAME 指令</span></span></a></li><li><a class="level is-mobile" href="#将MAKE-FUNCTION指令需要的参数入栈"><span class="level-left"><span class="level-item">4</span><span class="level-item">将MAKE FUNCTION指令需要的参数入栈</span></span></a></li><li><a class="level is-mobile" href="#MAKE-FUNCTION指令"><span class="level-left"><span class="level-item">5</span><span class="level-item">MAKE FUNCTION指令</span></span></a></li><li><a class="level is-mobile" href="#将PyFunctionObject放到局部变量表"><span class="level-left"><span class="level-item">6</span><span class="level-item">将PyFunctionObject放到局部变量表</span></span></a></li><li><a class="level is-mobile" href="#LOAD-NAME指令"><span class="level-left"><span class="level-item">7</span><span class="level-item">LOAD_NAME指令</span></span></a></li><li><a class="level is-mobile" href="#将实参push到栈上"><span class="level-left"><span class="level-item">8</span><span class="level-item">将实参push到栈上</span></span></a></li><li><a class="level is-mobile" href="#CALL-FUNCTION指令"><span class="level-left"><span class="level-item">9</span><span class="level-item">CALL FUNCTION指令</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#call-function函数"><span class="level-left"><span class="level-item">9.1</span><span class="level-item">call_function函数</span></span></a></li><li><a class="level is-mobile" href="#PyFunction-FastCallKeywords函数"><span class="level-left"><span class="level-item">9.2</span><span class="level-item">_PyFunction_FastCallKeywords函数</span></span></a></li></ul></li><li><a class="level is-mobile" href="#PyEval-EvalCodeWithName"><span class="level-left"><span class="level-item">10</span><span class="level-item">_PyEval_EvalCodeWithName</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#新的PyFrameObject"><span class="level-left"><span class="level-item">10.1</span><span class="level-item">新的PyFrameObject</span></span></a></li><li><a class="level is-mobile" href="#将位置参数和默认参数放到fastlocals"><span class="level-left"><span class="level-item">10.2</span><span class="level-item">将位置参数和默认参数放到fastlocals</span></span></a></li></ul></li><li><a class="level is-mobile" href="#执行函数体"><span class="level-left"><span class="level-item">11</span><span class="level-item">执行函数体</span></span></a></li></ul></div></div><style>#toc .menu-list > li > a.is-active + .menu-list { display: block; }#toc .menu-list > li > a + .menu-list { display: none; }</style><script src="/js/toc.js" defer></script></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/CPython/"><span class="tag">CPython</span><span class="tag">5</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Feed%E6%9C%8D%E5%8A%A1/"><span class="tag">Feed服务</span><span class="tag">3</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Knative/"><span class="tag">Knative</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Kubernetes/"><span class="tag">Kubernetes</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Linux%E7%BD%91%E7%BB%9C/"><span class="tag">Linux网络</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Python/"><span class="tag">Python</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Serverless/"><span class="tag">Serverless</span><span class="tag">5</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Yarn/"><span class="tag">Yarn</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E4%B8%80%E8%87%B4%E6%80%A7/"><span class="tag">分布式一致性</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%9C%A8%E7%A6%BB%E7%BA%BF%E6%B7%B7%E9%83%A8/"><span class="tag">在离线混部</span><span class="tag">4</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/"><span class="tag">大数据</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%97%B6%E9%97%B4%E5%BA%8F%E5%88%97/"><span class="tag">时间序列</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%99%BA%E8%83%BD%E8%BF%90%E7%BB%B4/"><span class="tag">智能运维</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BC%96%E8%AF%91%E5%8E%9F%E7%90%86/"><span class="tag">编译原理</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E8%99%9A%E6%8B%9F%E5%8C%96/"><span class="tag">网络虚拟化</span><span class="tag">3</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AF%AD%E8%A8%80%E7%89%B9%E6%80%A7/"><span class="tag">语言特性</span><span class="tag">2</span></a></div></div></div></div></div><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg"></figure><p class="is-size-6 is-block">公众号：面向问题编程</p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives"><p class="title">61</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories"><p class="title">5</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags"><p class="title">16</p></a></div></div></nav></div></div><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/"><span class="level-start"><span class="level-item">一文了解</span></span><span class="level-end"><span class="level-item tag">26</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E5%AE%9E%E8%B7%B5/"><span class="level-start"><span class="level-item">技术实践</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/"><span class="level-start"><span class="level-item">技术架构</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BB%BC%E8%BF%B0/"><span class="level-start"><span class="level-item">综述</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E9%97%AE%E9%A2%98/"><span class="level-start"><span class="level-item">问题</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li></ul></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a><p class="is-size-7"><span>&copy; 2022 面向问题编程</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-CN");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/lg-zoom@1.3.0/dist/lg-zoom.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script type="text/x-mathjax-config">MathJax.Hub.Config({
+            'HTML-CSS': {
+                matchFontHeight: false
+            },
+            SVG: {
+                matchFontHeight: false
+            },
+            CommonHTML: {
+                matchFontHeight: false
+            },
+            tex2jax: {
+                inlineMath: [
+                    ['$','$'],
+                    ['\\(','\\)']
+                ]
+            }
+        });</script><script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.9/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script><!--!--><!--!--><!--!--><script src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script src="/js/insight.js" defer></script><script>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script></body></html>

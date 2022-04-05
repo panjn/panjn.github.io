@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><title>谈Python的执行过程（1）：认识字节码和CPython对象 - 面向问题编程</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="面向问题编程"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="面向问题编程"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="本文描述CPython是如何执行一个Python程序的，并深入浅出地带你理解Python字节码、CPython对象。"><meta property="og:type" content="blog"><meta property="og:title" content="谈Python的执行过程（1）：认识字节码和CPython对象"><meta property="og:url" content="https://www.heapoverflow.cn/pages/cpython-3/"><meta property="og:site_name" content="面向问题编程"><meta property="og:description" content="本文描述CPython是如何执行一个Python程序的，并深入浅出地带你理解Python字节码、CPython对象。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://www.heapoverflow.cn/img/my/PyBytesObject.png"><meta property="article:published_time" content="2022-04-05T03:02:53.223Z"><meta property="article:modified_time" content="2022-04-05T03:07:12.994Z"><meta property="article:author" content="面向问题编程"><meta property="article:tag" content="CPython"><meta property="twitter:card" content="summary"><meta property="twitter:image" content="/img/my/PyBytesObject.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.heapoverflow.cn/pages/cpython-3/"},"headline":"谈Python的执行过程（1）：认识字节码和CPython对象","image":["https://www.heapoverflow.cn/img/my/PyBytesObject.png"],"datePublished":"2022-04-05T03:02:53.223Z","dateModified":"2022-04-05T03:07:12.994Z","author":{"@type":"Person","name":"面向问题编程"},"publisher":{"@type":"Organization","name":"面向问题编程","logo":{"@type":"ImageObject","url":"https://www.heapoverflow.cn/img/logo.svg"}},"description":"本文描述CPython是如何执行一个Python程序的，并深入浅出地带你理解Python字节码、CPython对象。"}</script><link rel="canonical" href="https://www.heapoverflow.cn/pages/cpython-3/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><script src="https://www.googletagmanager.com/gtag/js?id=G-ETGL163DQH" async></script><script>window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    
+        gtag('config', 'G-ETGL163DQH');</script><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><script data-ad-client="ca-pub-6757924689439593" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+          Array
+              .from(document.querySelectorAll('.tab-content'))
+              .forEach($tab => {
+                  $tab.classList.add('is-hidden');
+              });
+          Array
+              .from(document.querySelectorAll('.tabs li'))
+              .forEach($tab => {
+                  $tab.classList.remove('is-active');
+              });
+          const $activeTab = document.querySelector(location.hash);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+          const $tabMenu = document.querySelector(`a[href="${location.hash}"]`);
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 6.0.0"></head><body class="is-2-column"><nav class="navbar navbar-main"><div class="container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/categories/%E9%97%AE%E9%A2%98/">问题</a><a class="navbar-item" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/">技术架构</a><a class="navbar-item" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></div><div class="navbar-end"><a class="navbar-item" rel="noopener" title="分类" href="/categories">分类</a><a class="navbar-item" rel="noopener" title="标签" href="/tags">标签</a><a class="navbar-item" rel="noopener" title="归档" href="/archives">归档</a><a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;"><i class="fas fa-list-ul"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-9-widescreen"><div class="card"><div class="card-image"><span class="image is-7by3"><img class="fill" src="/img/my/PyBytesObject.png" alt="谈Python的执行过程（1）：认识字节码和CPython对象"></span></div><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-04-05T03:02:53.223Z" title="2022/4/5 上午11:02:53">2022-04-05</time>发表</span><span class="level-item"><time dateTime="2022-04-05T03:07:12.994Z" title="2022/4/5 上午11:07:12">2022-04-05</time>更新</span><span class="level-item">17 分钟读完 (大约2614个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">谈Python的执行过程（1）：认识字节码和CPython对象</h1><div class="content"><p>本文描述<strong>CPython</strong>是如何执行一个Python程序的。 通常来说我们运行Python有以下几种方式：</p>
+<span id="more"></span>
+
+<ul>
+<li><p>将一个字符串作为python代码运行</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">python -c &quot;print(1+1)&quot;</span><br></pre></td></tr></table></figure></li>
+<li><p>运行一个模块</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">echo &quot;print(1+2)&quot; &gt; test.py</span><br><span class="line">python -m test # run as module</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>运行一个Python文件</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">echo &quot;print(1+2)&quot; &gt; test.py</span><br><span class="line">python test.py</span><br></pre></td></tr></table></figure></li>
+</ul>
+<p>无论是哪种方式，我们都是只是在跑一个可执行程序Python，并附带了一些参数(比如<code>-c &quot;print(1+1)</code>)而已。
+而Python是一个用 C 语言编写的程序（CPython）。关于Linux下C程序是如何运行的可以看我之前写的文章
+<a href="/pages/wiki-howcrun/">一文了解C程序是如何运行起来的</a>。简单来说，这个过程是这样的:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">CPython源码</span><br><span class="line">-&gt;编译</span><br><span class="line">-&gt;链接</span><br><span class="line">-&gt;得到Python可执行程序(ELF格式)</span><br><span class="line">-&gt;运行</span><br><span class="line">-&gt;...</span><br><span class="line">-&gt;CPython的Main函数</span><br><span class="line">-&gt;...</span><br></pre></td></tr></table></figure>
+
+<p>接下来我们从CPython的Main函数出发，来探讨CPython的执行过程。</p>
+<h2 id="从Main函数到生成字节码"><a href="#从Main函数到生成字节码" class="headerlink" title="从Main函数到生成字节码"></a>从Main函数到生成字节码</h2><p>从Main函数到生成字节码(PyAST_CompileObject)之前的主要执行路径如下所示：
+<img src="/img/my/cpython-main.drawio.svg" alt="cpython执行过程"></p>
+<p>pymain_main函数会调用pymain_init会做一些初始化，比如解析命令行参数。</p>
+<blockquote>
+<p>pymain_init里有很多关键的初始化操作，这里先忽略</p>
+</blockquote>
+<p>然后调用pymain_run_python函数，
+后者会根据命令行参数来决定执行路径：</p>
+<ul>
+<li>跑字符串代码时，<code>python -c &quot;1+1&quot;</code>进入的是pymain_run_command函数</li>
+<li>跑模块时，<code>python -m test</code>进入的是pymain_run_module函数 </li>
+<li>跑文件时，<code>python test.py</code>进入的是pymain_run_filename函数</li>
+<li>交互式python，进入的是pymain_repl</li>
+</ul>
+<p>而之后的流程其实都是 </p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">源代码</span><br><span class="line">-&gt;词法分析, 语法分析, 生成AST(PyParser_ASTFromXXX)</span><br><span class="line">-&gt;生成字节码(PyPAST_CompileObject)</span><br><span class="line">-&gt;...</span><br></pre></td></tr></table></figure>
+<p>只不过</p>
+<ul>
+<li>对pymain_run_command，源代码是-c指定的字符串，生成AST是用PyParser_ASTFromStringObject函数。</li>
+<li>对pymain_run_filename，源代码在文件里。生成AST是用PyParser_ASTFromFileObject函数。 另外如果是pyc文件(内容就是magic number+更新时间戳+序列化的字节码)，就不会有生成AST和字节码的步骤。</li>
+<li>对pymain_repl，源代码其实也是在文件（Linux的stdin也是文件），其会进入PyRun_InteractiveLoopFlags函数，在它的loop里面，每次PyRun_InteractiveOneObjectEx，
+也是用PyParser_ASTFromFileObject函数生成AST。</li>
+</ul>
+<h2 id="Python的字节码"><a href="#Python的字节码" class="headerlink" title="Python的字节码"></a>Python的字节码</h2><p>在CPython的执行过程中，<code>run_mod</code>函数会调用PyAST_CompileObject生成PyCodeObject，这个结构体便是字节码在CPython中的内部表示。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> PyObject *</span><br><span class="line"><span class="title function_">run_mod</span><span class="params">(mod_ty mod, PyObject *filename, PyObject *globals, PyObject *locals,</span></span><br><span class="line"><span class="params">            PyCompilerFlags *flags, PyArena *arena)</span></span><br><span class="line">&#123;</span><br><span class="line">    PyCodeObject *co;</span><br><span class="line">    PyObject *v;</span><br><span class="line">    co = PyAST_CompileObject(mod, filename, flags, <span class="number">-1</span>, arena);</span><br><span class="line">    <span class="keyword">if</span> (co == <span class="literal">NULL</span>)</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">    v = PyEval_EvalCode((PyObject*)co, globals, locals);</span><br><span class="line">    Py_DECREF(co);</span><br><span class="line">    <span class="keyword">return</span> v;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>PyCodeObject结构体的一些字段定义如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> &#123;</span></span><br><span class="line">    PyObject_HEAD</span><br><span class="line">    PyObject *co_code;          <span class="comment">/* instruction opcodes */</span></span><br><span class="line">    PyObject *co_consts;        <span class="comment">/* list (constants used) */</span></span><br><span class="line">    PyObject *co_names;         <span class="comment">/* list of strings (names used) */</span></span><br><span class="line">   ...</span><br><span class="line">&#125; PyCodeObject;</span><br></pre></td></tr></table></figure>
+
+<h3 id="通过GDB查看PyCodeObject"><a href="#通过GDB查看PyCodeObject" class="headerlink" title="通过GDB查看PyCodeObject"></a>通过GDB查看PyCodeObject</h3><p>以下面的python代码(test.py)为例:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">a = <span class="number">1000</span></span><br></pre></td></tr></table></figure>
+<p>我们通过gdb查看其生成的PyCodeObject：</p>
+<ul>
+<li>启动gdb跑到run_mod断点处：<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">panjianning@VM-29-14-ubuntu:~$ gdb /home/panjianning/mypy/bin/python3.7</span><br><span class="line">GNU gdb (Ubuntu 7.11.1-0ubuntu1~16.5) 7.11.1</span><br><span class="line">...</span><br><span class="line">Reading symbols from /home/panjianning/mypy/bin/python3.7...done.</span><br><span class="line">(gdb) set args test.py</span><br><span class="line">(gdb) b run_mod</span><br><span class="line">Breakpoint 1 at 0x5247c0: file Python/pythonrun.c, line 1029.</span><br><span class="line">(gdb) r</span><br><span class="line">(gdb) next</span><br><span class="line">1032        co = PyAST_CompileObject(mod, filename, flags, -1, arena);</span><br><span class="line">(gdb) next</span><br><span class="line">1033        if (co == NULL)</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h4 id="打印-PyCodeObject对象co"><a href="#打印-PyCodeObject对象co" class="headerlink" title="打印 PyCodeObject对象co"></a>打印 <code>PyCodeObject</code>对象co</h4><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">(gdb) p *co</span><br><span class="line"><span class="meta">$</span><span class="language-bash">1 = &#123;ob_base = &#123;_ob_next = 0x7ffff6fd7c98, _ob_prev = 0x8c3120 &lt;refchain&gt;, ob_refcnt = 1,</span></span><br><span class="line">    ob_type = 0x90d520 &lt;PyCode_Type&gt;&#125;, co_argcount = 0, co_kwonlyargcount = 0, co_nlocals = 0, co_stacksize = 1,</span><br><span class="line">  co_flags = 64, co_firstlineno = 1, co_code = 0x7ffff6f9cc40, co_consts = 0x7ffff6fd7c98,</span><br><span class="line">  co_names = 0x7ffff706f608, co_varnames = 0x7ffff7e07058, co_freevars = 0x7ffff7e07058,</span><br><span class="line">  co_cellvars = 0x7ffff7e07058, co_cell2arg = 0x0, co_filename = 0x7ffff6f0d588, co_name = 0x7ffff6fd75f0,</span><br><span class="line">  co_lnotab = 0x7ffff6f0d5f0, co_zombieframe = 0x0, co_weakreflist = 0x0, co_extra = 0x0&#125;</span><br></pre></td></tr></table></figure>
+
+<p>加载python-gdb插件，来更好第打印它：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">gdb) source /home/panjianning/Python-3.7.0/python-gdb.py</span><br><span class="line">(gdb) p *co</span><br><span class="line"><span class="meta">$</span><span class="language-bash">6 = &#123;ob_base = &#123;_ob_next = 0x7ffff6fd7c98, _ob_prev = 0x8c3120 &lt;refchain&gt;, ob_refcnt = 1,</span></span><br><span class="line">    ob_type = 0x90d520 &lt;PyCode_Type&gt;&#125;, co_argcount = 0, co_kwonlyargcount = 0, co_nlocals = 0, co_stacksize = 1,</span><br><span class="line">  co_flags = 64, co_firstlineno = 1, co_code = b&#x27;d\x00Z\x00d\x01S\x00&#x27;, co_consts = (1000, None),</span><br><span class="line">  co_names = (&#x27;a&#x27;,), co_varnames = (), co_freevars = (), co_cellvars = (), co_cell2arg = 0x0,</span><br><span class="line">  co_filename = &#x27;test.py&#x27;, co_name = &#x27;&lt;module&gt;&#x27;, co_lnotab = b&#x27;&#x27;, co_zombieframe = 0x0, co_weakreflist = 0x0,</span><br><span class="line">  co_extra = 0x0&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="co-code字段和PyBytesObject"><a href="#co-code字段和PyBytesObject" class="headerlink" title="co_code字段和PyBytesObject"></a><code>co_code</code>字段和PyBytesObject</h3><p>注意其中co_code这里显示为<code>b&#39;d\x00Z\x00d\x01S\x00&#39;</code>, 在python中运行</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="string">b&quot;d\x00Z\x00d\x01S\x00&quot;</span>.<span class="built_in">hex</span>()</span><br></pre></td></tr></table></figure>
+<p>得到十六进制字符串<code>0x64005a0064015300</code>，这串东西表示什么呢？
+实际上我们可以这样看它：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">0x64</span> <span class="number">0x00</span></span><br><span class="line"><span class="number">0x5a</span> <span class="number">0x00</span></span><br><span class="line"><span class="number">0x64</span> <span class="number">0x01</span></span><br><span class="line"><span class="number">0x53</span> <span class="number">0x00</span></span><br></pre></td></tr></table></figure>
+<p>翻译为10进制便是</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">100</span> <span class="number">0</span></span><br><span class="line"><span class="number">90</span> <span class="number">0</span></span><br><span class="line"><span class="number">100</span> <span class="number">1</span></span><br><span class="line"><span class="number">83</span> <span class="number">0</span></span><br></pre></td></tr></table></figure>
+<p>每一行其实都是一个字节码指令，第一列为操作码(opcode)，第二列为操作数(不过并非所有指令的操作数都是一个字节)。</p>
+<ul>
+<li>opcode&#x3D;100表示LOAD_CONST</li>
+<li>opcode&#x3D;90表示STORE_NAME指令</li>
+<li>opcode&#x3D;83表示RETURN_VALUE指令</li>
+</ul>
+<p>实际上，我们可以通过python的dis模块反汇编字节码：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> dis</span><br><span class="line">dis.dis(<span class="string">&quot;a=1000&quot;</span>)</span><br></pre></td></tr></table></figure>
+<p>得到</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">1</span>            <span class="number">0</span> LOAD_CONST               <span class="number">0</span> (<span class="number">1000</span>)</span><br><span class="line">             <span class="number">2</span> STORE_NAME               <span class="number">0</span> (a)</span><br><span class="line">             <span class="number">4</span> LOAD_CONST               <span class="number">1</span> (<span class="literal">None</span>)</span><br><span class="line">             <span class="number">6</span> RETURN_VALUE</span><br></pre></td></tr></table></figure>
+<p>或者这样：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">bytecode = dis.Bytecode(<span class="string">&quot;a=1000&quot;</span>)</span><br><span class="line"><span class="keyword">for</span> instr <span class="keyword">in</span> bytecode:</span><br><span class="line">    <span class="built_in">print</span>(instr)</span><br></pre></td></tr></table></figure>
+<p>得到：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Instruction(opname=<span class="string">&#x27;LOAD_CONST&#x27;</span>, opcode=<span class="number">100</span>, arg=<span class="number">0</span>, argval=<span class="number">1000</span>, argrepr=<span class="string">&#x27;1000&#x27;</span>, offset=<span class="number">0</span>, starts_line=<span class="number">1</span>, is_jump_target=<span class="literal">False</span>)</span><br><span class="line">Instruction(opname=<span class="string">&#x27;STORE_NAME&#x27;</span>, opcode=<span class="number">90</span>, arg=<span class="number">0</span>, argval=<span class="string">&#x27;a&#x27;</span>, argrepr=<span class="string">&#x27;a&#x27;</span>, offset=<span class="number">2</span>, starts_line=<span class="literal">None</span>, is_jump_target=<span class="literal">False</span>)</span><br><span class="line">Instruction(opname=<span class="string">&#x27;LOAD_CONST&#x27;</span>, opcode=<span class="number">100</span>, arg=<span class="number">1</span>, argval=<span class="literal">None</span>, argrepr=<span class="string">&#x27;None&#x27;</span>, offset=<span class="number">4</span>, starts_line=<span class="literal">None</span>, is_jump_target=<span class="literal">False</span>)</span><br><span class="line">Instruction(opname=<span class="string">&#x27;RETURN_VALUE&#x27;</span>, opcode=<span class="number">83</span>, arg=<span class="literal">None</span>, argval=<span class="literal">None</span>, argrepr=<span class="string">&#x27;&#x27;</span>, offset=<span class="number">6</span>, starts_line=<span class="literal">None</span>, is_jump_target=<span class="literal">False</span>)</span><br></pre></td></tr></table></figure>
+
+<h4 id="PyBytesObject"><a href="#PyBytesObject" class="headerlink" title="PyBytesObject"></a>PyBytesObject</h4><p>值得一提的是，co_code字段并非只是单纯的指令字节（这里是8个字节），从之前的定义上我们知道，co_code是一个<code>PyObject*</code>指针，
+实际上co_code指向的是一个PyBytesObject对象，它的内存布局为：</p>
+<p><img src="/img/my/PyBytesObject.png" alt="PyBytesObject内存布局"></p>
+<p>通过打印co_code-&gt;ob_sval处的co_code-&gt;ob_size个字节，我们便得到了之前的0x64005a0064015300</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">(gdb) p *(PyBytesObject*)co-&gt;co_code</span><br><span class="line"><span class="meta">$</span><span class="language-bash">2 = &#123;ob_base = &#123;ob_base = &#123;_ob_next = 0x7ffff706f608, _ob_prev = 0x7ffff6fd7c98, ob_refcnt = 1,</span></span><br><span class="line">      ob_type = 0x8b23a0 &lt;PyBytes_Type&gt;&#125;, ob_size = 8&#125;, ob_shash = -1, ob_sval = &quot;d&quot;&#125;</span><br><span class="line">(gdb) x /8b (*(PyBytesObject*)co-&gt;co_code)-&gt;ob_sval</span><br><span class="line">0x7ffff6f9cc70: 0x64    0x00    0x5a    0x00    0x64    0x01    0x53    0x00</span><br><span class="line">(gdb)</span><br></pre></td></tr></table></figure>
+<h3 id="co-consts和co-names字段"><a href="#co-consts和co-names字段" class="headerlink" title="co_consts和co_names字段"></a><code>co_consts</code>和<code>co_names</code>字段</h3><p>在之前的指令中，我们可以看到四个指令的操作数分别是0, 0, 1, 0, 它们分别代表什么?
+实际上，</p>
+<ul>
+<li>对<code>LOAD_CONST 0</code>指令，0表示的是co_consts中数据的索引；</li>
+<li>对<code>STORE_NAME 1</code>指令，1表示的是co_names中数据的索引。</li>
+</ul>
+<h4 id="PyTupleObject"><a href="#PyTupleObject" class="headerlink" title="PyTupleObject"></a>PyTupleObject</h4><p>co_consts和co_names指向的都是PyTupleObject, 其数据分别为<code>(1000, None)</code>和<code>(&#39;a&#39;,)</code></p>
+<p>通过gdb查看co_consts：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">(gdb) p *(PyTupleObject*)co-&gt;co_consts</span><br><span class="line">$<span class="number">44</span> = &#123;ob_base = &#123;ob_base = &#123;_ob_next = <span class="number">0x7ffff6f9cc40</span>, _ob_prev = <span class="number">0x7ffff6f684c0</span>, ob_refcnt = <span class="number">1</span>,</span><br><span class="line">      ob_type = <span class="number">0x8c6920</span> &lt;PyTuple_Type&gt;&#125;, ob_size = <span class="number">2</span>&#125;, ob_item = &#123;<span class="number">1000</span>&#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="PyLongObject"><a href="#PyLongObject" class="headerlink" title="PyLongObject"></a>PyLongObject</h4><p>它的内存布局类似于之前的PyBytesObject, 只不过它的数据元素是PyObject*指针，而PyBytesObject是char, ob_size&#x3D;2表示这个tuple长度为2，</p>
+<p>co_consts的第一个item为1000， 其实它的类型是PyLongObject:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">(gdb) p *((PyLongObject*)(*((PyTupleObject*)co-&gt;co_consts)-&gt;ob_item))</span><br><span class="line">$<span class="number">46</span> = &#123;ob_base = &#123;ob_base = &#123;_ob_next = <span class="number">0x7ffff7093c98</span>, _ob_prev = <span class="number">0x7ffff6fd7660</span>, ob_refcnt = <span class="number">2</span>,</span><br><span class="line">      ob_type = <span class="number">0x8beb20</span> &lt;PyLong_Type&gt;&#125;, ob_size = <span class="number">1</span>&#125;, ob_digit = &#123;<span class="number">1000</span>&#125;&#125;</span><br></pre></td></tr></table></figure>
+<p>这里为了显示这个PyLongObject,我们做了几层类型转换</p>
+<ul>
+<li><code>(PyTupleObject*)co-&gt;co_consts</code> 首先将co-&gt;co_consts转为PyTupleObject类型的指针</li>
+<li><code>(PyTupleObject*)co-&gt;co_consts)-&gt;ob_item</code> 处的值是两个PyObject的地址</li>
+<li><code>*((PyTupleObject*)co-&gt;co_consts)-&gt;ob_item)</code>取第一个地址，它实际指向的是PyLongObject</li>
+<li>最后将这个地址转换为PyLongObject指针，再解引用，便得到了表示1000的PyLongObject。</li>
+</ul>
+<p>PyLongObject的内存布局实际也与PyBytesObject类型，只不过它的数据元素是整数(比如uint32_t), 这里它只有一个元素1000，
+假如有一个超级大的数，就可以用多个元素来表示它。这就是Python的整数的精度这么大的原因。</p>
+<h2 id="CPython中的对象"><a href="#CPython中的对象" class="headerlink" title="CPython中的对象"></a>CPython中的对象</h2><p>总结一下，目前为止，我们已经见过了几种类型的对象， PyObject, PyBytesObject, PyTupleObject, PyLongObject，PyCodeObject</p>
+<p>再次看之前的PyBytesObject内存布局图，PyObject类型其实就是前四个字段，而后三者都加了个ob_size字段，这样它们都是PyVarObject类型，
+即所谓的<em>变长对象</em>。变成并不是说<code>sizeof(PyBytesObject)</code>会得到不固定的结构，C中结构体大小肯定是固定的，只不过利用ob_size，
+我们可以把数据紧接着放在结构体后面，这后面数据的大小可以通过ob_size和结构中定义的数据元素类型确定，这样就达到了变长的目的。</p>
+<ul>
+<li>PyBytesObject的ob_size表示在结构体末尾的内存开始往后存储了多少个char (byte)</li>
+<li>PyLongObject的ob_size表示在结构体末尾的内存开始往后存储了多少个整数 (digit, 具体类型可以是uint32_t)</li>
+<li>PyTupleObject的ob_size表示在结构体末尾的内存开始往后存储了多少个PyObject指针。</li>
+</ul>
+<p>PyCodeObject没有ob_size字段，它是一个定长对象，并有很多自己的字段，我们在前文中分析了co_code、co_consts和co_names字段。</p>
+<h2 id="参考链接"><a href="#参考链接" class="headerlink" title="参考链接"></a>参考链接</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://nanguage.gitbook.io/inside-python-vm-cn/2.-the-view-from-30-000ft">Python 执行过程鸟瞰 | 深入理解Python虚拟机</a></li>
+<li><a target="_blank" rel="noopener" href="https://docs.python.org/zh-cn/3.7/c-api/index.html">Python&#x2F;C API 参考手册</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/python/cpython/blob/3.7/Programs/python.c#L13">Main函数 | Programs&#x2F;python.c</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/python/cpython/blob/3.7/Modules/main.c#L3096">_Py_UnixMain 函数 | Modules&#x2F;main.c</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/python/cpython/blob/3.7/Modules/main.c#L3084">Py_Main函数 | Modules&#x2F;main.c</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/python/cpython/blob/3.7/Modules/main.c#L3061">pymain_main函数 | Modules&#x2F;main.c</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/python/cpython/blob/3.7/Modules/main.c#L3011">pymain_init函数 | Modules&#x2F;main.c</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/python/cpython/blob/3.7/Modules/main.c#L2893">pymain_run_python函数 | Modules&#x2F;main.c</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/python/cpython/blob/3.7/Modules/main.c#L398">pymain_run_command | 函数 | Modules&#x2F;main.c</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/python/cpython/blob/3.7/Modules/main.c#L398">pymain_run_module | 函数 | Modules&#x2F;main.c</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/python/cpython/blob/3.7/Modules/main.c#L1622">pymain_run_filename | 函数 | Modules&#x2F;main.c</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/python/cpython/blob/3.7/Modules/main.c#L1651">pymain_repl 函数 | Modules&#x2F;main.c</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/python/cpython/blob/3.7/Python/pythonrun.c#L448">PyRun_SimpleStringFlags函数 | Python&#x2F;pythonrun.c</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/python/cpython/blob/3.7/Python/pythonrun.c#L943">PyRun_StringFlags函数 | Python&#x2F;pythonrun.c</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/python/cpython/blob/3.7/Python/pythonrun.c#L1169">PyParser_ASTFromStringObject函数 | Python&#x2F;pythonrun.c</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/python/cpython/blob/3.7/Python/pythonrun.c#L1029">run_mod函数 | Python&#x2F;pythonrun.c</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/python/cpython/blob/3.7/Python/ceval.c#L522">PyEval_EvalCode函数 | Python&#x2F;ceval.c</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/python/cpython/blob/3.7/Python/ceval.c#L3953">PyEval_EvalCodeEx函数 | Python&#x2F;ceval.c</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/python/cpython/blob/3.7/Include/code.h#L21">PyCodeObject结构体 | Include&#x2F;code.h</a></li>
+</ul>
+</div><div class="article-licensing box"><div class="licensing-title"><p>谈Python的执行过程（1）：认识字节码和CPython对象</p><p><a href="https://www.heapoverflow.cn/pages/cpython-3/">https://www.heapoverflow.cn/pages/cpython-3/</a></p></div><div class="licensing-meta level is-mobile"><div class="level-left"><div class="level-item is-narrow"><div><h6>作者</h6><p>面向问题编程</p></div></div><div class="level-item is-narrow"><div><h6>发布于</h6><p>2022-04-05</p></div></div><div class="level-item is-narrow"><div><h6>更新于</h6><p>2022-04-05</p></div></div><div class="level-item is-narrow"><div><h6>许可协议</h6><p><a class="icons" rel="noopener" target="_blank" title="Creative Commons" href="https://creativecommons.org/"><i class="icon fab fa-creative-commons"></i></a><a class="icons" rel="noopener" target="_blank" title="Attribution" href="https://creativecommons.org/licenses/by/4.0/"><i class="icon fab fa-creative-commons-by"></i></a><a class="icons" rel="noopener" target="_blank" title="Noncommercial" href="https://creativecommons.org/licenses/by-nc/4.0/"><i class="icon fab fa-creative-commons-nc"></i></a></p></div></div></div></div></div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/CPython/">CPython</a></div><!--!--><div><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6757924689439593" crossOrigin="anonymous"></script><ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-6757924689439593" data-ad-slot="2352785969"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div></article></div><!--!--><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/pages/cpython-4/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">谈Python的执行过程（2）：字节码的执行</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/pages/cpython-2/"><span class="level-item">用GDB调试CPython</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--><div style="width:100%"><script src="https://giscus.app/client.js" data-repo="thetechstack/thetechstack.github.io" data-repo-id="R_kgDOG6Ti1Q" data-category="Announcements" data-category-id="DIC_kwDOG6Ti1c4COQtm" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light" data-lang="zh-CN" crossOrigin="anonymous" async></script></div></div><!--!--><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen  order-3 is-sticky"><div class="card widget" id="toc" data-type="toc"><div class="card-content"><div class="menu"><h3 class="menu-label">目录</h3><ul class="menu-list"><li><a class="level is-mobile" href="#从Main函数到生成字节码"><span class="level-left"><span class="level-item">1</span><span class="level-item">从Main函数到生成字节码</span></span></a></li><li><a class="level is-mobile" href="#Python的字节码"><span class="level-left"><span class="level-item">2</span><span class="level-item">Python的字节码</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#通过GDB查看PyCodeObject"><span class="level-left"><span class="level-item">2.1</span><span class="level-item">通过GDB查看PyCodeObject</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#打印-PyCodeObject对象co"><span class="level-left"><span class="level-item">2.1.1</span><span class="level-item">打印 PyCodeObject对象co</span></span></a></li></ul></li><li><a class="level is-mobile" href="#co-code字段和PyBytesObject"><span class="level-left"><span class="level-item">2.2</span><span class="level-item">co_code字段和PyBytesObject</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#PyBytesObject"><span class="level-left"><span class="level-item">2.2.1</span><span class="level-item">PyBytesObject</span></span></a></li></ul></li><li><a class="level is-mobile" href="#co-consts和co-names字段"><span class="level-left"><span class="level-item">2.3</span><span class="level-item">co_consts和co_names字段</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#PyTupleObject"><span class="level-left"><span class="level-item">2.3.1</span><span class="level-item">PyTupleObject</span></span></a></li><li><a class="level is-mobile" href="#PyLongObject"><span class="level-left"><span class="level-item">2.3.2</span><span class="level-item">PyLongObject</span></span></a></li></ul></li></ul></li><li><a class="level is-mobile" href="#CPython中的对象"><span class="level-left"><span class="level-item">3</span><span class="level-item">CPython中的对象</span></span></a></li><li><a class="level is-mobile" href="#参考链接"><span class="level-left"><span class="level-item">4</span><span class="level-item">参考链接</span></span></a></li></ul></div></div><style>#toc .menu-list > li > a.is-active + .menu-list { display: block; }#toc .menu-list > li > a + .menu-list { display: none; }</style><script src="/js/toc.js" defer></script></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/CPython/"><span class="tag">CPython</span><span class="tag">5</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Feed%E6%9C%8D%E5%8A%A1/"><span class="tag">Feed服务</span><span class="tag">3</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Knative/"><span class="tag">Knative</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Kubernetes/"><span class="tag">Kubernetes</span><span class="tag">22</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Linux%E7%BD%91%E7%BB%9C/"><span class="tag">Linux网络</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Python/"><span class="tag">Python</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Serverless/"><span class="tag">Serverless</span><span class="tag">5</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Yarn/"><span class="tag">Yarn</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E4%B8%80%E8%87%B4%E6%80%A7/"><span class="tag">分布式一致性</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%9C%A8%E7%A6%BB%E7%BA%BF%E6%B7%B7%E9%83%A8/"><span class="tag">在离线混部</span><span class="tag">4</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/"><span class="tag">大数据</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%97%B6%E9%97%B4%E5%BA%8F%E5%88%97/"><span class="tag">时间序列</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%99%BA%E8%83%BD%E8%BF%90%E7%BB%B4/"><span class="tag">智能运维</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BC%96%E8%AF%91%E5%8E%9F%E7%90%86/"><span class="tag">编译原理</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E8%99%9A%E6%8B%9F%E5%8C%96/"><span class="tag">网络虚拟化</span><span class="tag">3</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AF%AD%E8%A8%80%E7%89%B9%E6%80%A7/"><span class="tag">语言特性</span><span class="tag">2</span></a></div></div></div></div></div><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg"></figure><p class="is-size-6 is-block">公众号：面向问题编程</p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives"><p class="title">61</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories"><p class="title">5</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags"><p class="title">16</p></a></div></div></nav></div></div><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/"><span class="level-start"><span class="level-item">一文了解</span></span><span class="level-end"><span class="level-item tag">26</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E5%AE%9E%E8%B7%B5/"><span class="level-start"><span class="level-item">技术实践</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/"><span class="level-start"><span class="level-item">技术架构</span></span><span class="level-end"><span class="level-item tag">7</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BB%BC%E8%BF%B0/"><span class="level-start"><span class="level-item">综述</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E9%97%AE%E9%A2%98/"><span class="level-start"><span class="level-item">问题</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li></ul></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a><p class="is-size-7"><span>&copy; 2022 面向问题编程</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-CN");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/lg-zoom@1.3.0/dist/lg-zoom.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script type="text/x-mathjax-config">MathJax.Hub.Config({
+            'HTML-CSS': {
+                matchFontHeight: false
+            },
+            SVG: {
+                matchFontHeight: false
+            },
+            CommonHTML: {
+                matchFontHeight: false
+            },
+            tex2jax: {
+                inlineMath: [
+                    ['$','$'],
+                    ['\\(','\\)']
+                ]
+            }
+        });</script><script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.9/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script><!--!--><!--!--><!--!--><script src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script src="/js/insight.js" defer></script><script>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script></body></html>
