@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><title>性能提升40%: 腾讯 TKE 用 eBPF绕过 conntrack 优化K8s Service - 面向问题编程</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="面向问题编程"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="面向问题编程"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="作者范建明、洪志国、张浩，均为腾讯云容器产品中心高级工程师，负责容器网络和Service Mesh，容器Runtime，调度等相关研发工作。 Kubernetes Service[1] 用于实现集群中业务之间的互相调用和负载均衡，目前社区的实现主要有userspace，iptables和IPVS三种模式。IPVS模式的性能最好，但依然有优化的空间。该模式利用IPVS内核模块实现DNAT，利用nf_"><meta property="og:type" content="blog"><meta property="og:title" content="性能提升40%: 腾讯 TKE 用 eBPF绕过 conntrack 优化K8s Service"><meta property="og:url" content="https://www.heapoverflow.cn/pages/practice-tx-k8s-2/"><meta property="og:site_name" content="面向问题编程"><meta property="og:description" content="作者范建明、洪志国、张浩，均为腾讯云容器产品中心高级工程师，负责容器网络和Service Mesh，容器Runtime，调度等相关研发工作。 Kubernetes Service[1] 用于实现集群中业务之间的互相调用和负载均衡，目前社区的实现主要有userspace，iptables和IPVS三种模式。IPVS模式的性能最好，但依然有优化的空间。该模式利用IPVS内核模块实现DNAT，利用nf_"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://www.heapoverflow.cn/img/practice-tx-k8s-2/1.jpg"><meta property="article:published_time" content="2022-04-06T15:02:02.635Z"><meta property="article:modified_time" content="2022-04-06T15:06:03.323Z"><meta property="article:author" content="面向问题编程"><meta property="article:tag" content="Kubernetes"><meta property="twitter:card" content="summary"><meta property="twitter:image" content="/img/practice-tx-k8s-2/1.jpg"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.heapoverflow.cn/pages/practice-tx-k8s-2/"},"headline":"性能提升40%: 腾讯 TKE 用 eBPF绕过 conntrack 优化K8s Service","image":["https://www.heapoverflow.cn/img/practice-tx-k8s-2/1.jpg"],"datePublished":"2022-04-06T15:02:02.635Z","dateModified":"2022-04-06T15:06:03.323Z","author":{"@type":"Person","name":"面向问题编程"},"publisher":{"@type":"Organization","name":"面向问题编程","logo":{"@type":"ImageObject","url":"https://www.heapoverflow.cn/img/logo.svg"}},"description":"作者范建明、洪志国、张浩，均为腾讯云容器产品中心高级工程师，负责容器网络和Service Mesh，容器Runtime，调度等相关研发工作。 Kubernetes Service[1] 用于实现集群中业务之间的互相调用和负载均衡，目前社区的实现主要有userspace，iptables和IPVS三种模式。IPVS模式的性能最好，但依然有优化的空间。该模式利用IPVS内核模块实现DNAT，利用nf_"}</script><link rel="canonical" href="https://www.heapoverflow.cn/pages/practice-tx-k8s-2/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><script src="https://www.googletagmanager.com/gtag/js?id=G-ETGL163DQH" async></script><script>window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    
+        gtag('config', 'G-ETGL163DQH');</script><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><script data-ad-client="ca-pub-6757924689439593" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+          Array
+              .from(document.querySelectorAll('.tab-content'))
+              .forEach($tab => {
+                  $tab.classList.add('is-hidden');
+              });
+          Array
+              .from(document.querySelectorAll('.tabs li'))
+              .forEach($tab => {
+                  $tab.classList.remove('is-active');
+              });
+          const $activeTab = document.querySelector(location.hash);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+          const $tabMenu = document.querySelector(`a[href="${location.hash}"]`);
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 6.0.0"></head><body class="is-2-column"><nav class="navbar navbar-main"><div class="container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/categories/%E9%97%AE%E9%A2%98/">问题</a><a class="navbar-item" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/">技术架构</a><a class="navbar-item" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></div><div class="navbar-end"><a class="navbar-item" rel="noopener" title="分类" href="/categories">分类</a><a class="navbar-item" rel="noopener" title="标签" href="/tags">标签</a><a class="navbar-item" rel="noopener" title="归档" href="/archives">归档</a><a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;"><i class="fas fa-list-ul"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-9-widescreen"><div class="card"><div class="card-image"><span class="image is-7by3"><img class="fill" src="/img/practice-tx-k8s-2/1.jpg" alt="性能提升40%: 腾讯 TKE 用 eBPF绕过 conntrack 优化K8s Service"></span></div><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-04-06T15:02:02.635Z" title="2022/4/6 下午11:02:02">2022-04-06</time>发表</span><span class="level-item"><time dateTime="2022-04-06T15:06:03.323Z" title="2022/4/6 下午11:06:03">2022-04-06</time>更新</span><span class="level-item"><a class="link-muted" href="/categories/%E6%8A%80%E6%9C%AF%E5%AE%9E%E8%B7%B5/">技术实践</a></span><span class="level-item">20 分钟读完 (大约2976个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">性能提升40%: 腾讯 TKE 用 eBPF绕过 conntrack 优化K8s Service</h1><div class="content"><p>作者范建明、洪志国、张浩，均为腾讯云容器产品中心高级工程师，负责容器网络和Service Mesh，容器Runtime，调度等相关研发工作。</p>
+<p><strong>Kubernetes Service</strong>[1] 用于实现集群中业务之间的互相调用和负载均衡，目前社区的实现主要有userspace，iptables和IPVS三种模式。IPVS模式的性能最好，但依然有优化的空间。该模式利用IPVS内核模块实现DNAT，利用nf_conntrack&#x2F;iptables实现SNAT。nf_conntrack是为通用目的设计的，其内部的状态和流程都比较复杂，带来很大的性能损耗。</p>
+<p>腾讯TKE团队[2] 开发了新的IPVS-BPF模式，完全绕过nf_conntrack的处理逻辑，使用eBPF完成SNAT功能。对最常用的Pod访问ClusterIP场景，短连接性能提升**40%<strong>，p99时延降低</strong>31%**；NodePort场景提升，详情见下表和<code>性能测量</code>章节。</p>
+<span id="more"></span>
+
+<p><img src="/img/practice-tx-k8s-2/0.jpg"></p>
+<h2 id="一、容器网络现状"><a href="#一、容器网络现状" class="headerlink" title="一、容器网络现状"></a>一、容器网络现状</h2><h3 id="iptables模式"><a href="#iptables模式" class="headerlink" title="iptables模式"></a>iptables模式</h3><p>存在的问题：</p>
+<p><strong>1．可扩展性差。</strong>随着service数据达到数千个，其控制面和数据面的性能都会急剧下降。原因在于iptables控制面的接口设计中，每添加一条规则，需要遍历和修改所有的规则，其控制面性能是_O(_n²_)<em>。在数据面，规则是用链表组织的，其性能是_O(n)</em></p>
+<p><strong>2．LB调度算法仅支持随机转发</strong></p>
+<h3 id="IPVS模式"><a href="#IPVS模式" class="headerlink" title="IPVS模式"></a>IPVS模式</h3><p>IPVS 是专门为LB设计的。它用hash table管理service，对service的增删查找都是_O(1)_的时间复杂度。不过IPVS内核模块没有SNAT功能，因此借用了iptables的SNAT功能。IPVS 针对报文做DNAT后，将连接信息保存在nf_conntrack中，iptables据此接力做SNAT。该模式是目前Kubernetes网络性能最好的选择。但是由于nf_conntrack的复杂性，带来了很大的性能损耗。</p>
+<h2 id="二、IPVS-BPF方案介绍"><a href="#二、IPVS-BPF方案介绍" class="headerlink" title="二、IPVS-BPF方案介绍"></a>二、IPVS-BPF方案介绍</h2><h3 id="eBPF-介绍"><a href="#eBPF-介绍" class="headerlink" title="eBPF 介绍"></a>eBPF 介绍</h3><p>eBPF[3]是Linux内核中软件实现的虚拟机。用户把eBPF程序编译为eBPF指令，然后通过bpf()系统调用将eBPF指令加载到内核的特定挂载点，由特定的事件来触发eBPF指令的执行。在挂载eBPF指令时内核会进行充分验证，避免eBPF代码影响内核的安全和稳定性。另外内核也会进行JIT编译，把eBPF指令翻译为本地指令，减少性能开销。</p>
+<p>内核在网络处理路径上中预置了很多eBPF的挂载点，例如xdp, qdisc, tcp-bpf, socket等。eBPF程序可以加载到这些挂载点，并调用内核提供的特定API来修改和控制网络报文。eBPF程序可以通过map数据结构来保存和交换数据。</p>
+<h3 id="基于eBPF的IPVS-BPF优化方案"><a href="#基于eBPF的IPVS-BPF优化方案" class="headerlink" title="基于eBPF的IPVS-BPF优化方案"></a>基于eBPF的IPVS-BPF优化方案</h3><p>针对nf_conntrack带来的性能问题，腾讯TKE团队设计实现了IPVS-BPF。核心思想是绕过nf_conntrack，减少处理每个报文的指令数目，从而节约CPU，提高性能。其主要逻辑如下:</p>
+<ol>
+<li>在IPVS内核模块中引入开关，支持原生IPVS逻辑和IPVS-BPF逻辑的切换</li>
+<li>在IPVS-BPF模式下，将IPVS hook点从LOCALIN前移到PREROUTING，使访问service的请求绕过nf_conntrack</li>
+<li>在IPVS新建连接和删除连接的代码中，相应的增删eBPF map中的session信息</li>
+<li>在qdisc挂载eBPF的SNAT代码，根据eBPF map中的session信息执行SNAT</li>
+</ol>
+<p>此外，针对icmp, fragmentation均有专门处理，详细背景和细节，会在后续的QCon在线会议[4]上介绍, 欢迎一起探讨。</p>
+<h4 id="优化前后报文处理流程的对比"><a href="#优化前后报文处理流程的对比" class="headerlink" title="优化前后报文处理流程的对比"></a>优化前后报文处理流程的对比</h4><p><img src="/img/practice-tx-k8s-2/1.jpg"></p>
+<p>可以看到，报文处理流程得到了极大简化。  </p>
+<h3 id="为什么不直接采用全eBPF方式"><a href="#为什么不直接采用全eBPF方式" class="headerlink" title="为什么不直接采用全eBPF方式"></a>为什么不直接采用全eBPF方式</h3><p>很多读者会问，为什么还要用IPVS模块跟eBPF相结合，而不是直接使用eBPF把Service功能都实现了呢？</p>
+<p>我们在设计之初也仔细研究了这个问题, 主要有以下几点考虑：</p>
+<ul>
+<li>nf_conntrack对CPU指令和时延的消耗，大于IPVS模块，是转发路径的头号性能杀手。而IPVS本身是为高性能而设计的，不是性能瓶颈所在</li>
+<li>IPVS有接近20年的历史，广泛应用于生产环境，性能和成熟度都有保障</li>
+<li>IPVS内部通过timer来维护session表的老化，而eBPF不支持timer, 只能通过用户空间代码来协同维护session表</li>
+<li>IPVS支持丰富的调度策略，用eBPF来重写这些调度策略，代码量大不说，很多调度策略需要的循环语句，eBPF也不支持</li>
+</ul>
+<p>我们的目标是实现代码量可控，能落地的优化方案。基于以上考虑，我们选择了复用IPVS模块，绕过nf_conntrack，用eBPF完成SNAT的方案。最终数据面代码量为：500+行BPF代码， 1000+行IPVS模块改动（大部分为辅助SNAT map管理的新增代码）。</p>
+<h2 id="三、性能测量"><a href="#三、性能测量" class="headerlink" title="三、性能测量"></a>三、性能测量</h2><p>本章节通过量化分析的方法，用perf工具读取CPU性能计数器，从微观的角度解释宏观的性能数据。本文采用的压测程序是wrk和iperf。</p>
+<h3 id="测试环境"><a href="#测试环境" class="headerlink" title="测试环境"></a>测试环境</h3><p>复现该测试需要注意两点：</p>
+<ol>
+<li>不同的集群和机器，即使机型都一样，也可能因为各自母机和机架的拓扑不同，造成性能数据有背景差异。为了减少这类差异带来的误差，我们对比IPVS模式和IPVS-BPF模式时，是使用同一个集群，同样一组后端Pod, 并且使用同一个LB节点。先在IPVS模式下测出IPVS性能数据，然后把LB节点切换到IPVS-BPF模式, 再测出IPVS-BPF模式的性能数据。(注：切换模式是通过后台把控制面从kube-proxy切换为kube-proxy-bpf来实现的，产品功能上并不支持这样在线切换)</li>
+<li>本测试的目标是测量LB上软件模块优化对于访问service性能的影响，不能让客户端和RS目标服务器的带宽与CPU成为瓶颈。所以被压测的LB节点采用1核机型，不运行后端Pod实例；而运行后端服务的节点采用8核机型</li>
+</ol>
+<h4 id="NodePort"><a href="#NodePort" class="headerlink" title="NodePort"></a>NodePort</h4><p><img src="/img/practice-tx-k8s-2/2.jpg"></p>
+<p>为了采集CPI等指标，这里LB节点(红色部分)采用黑石裸金属机器，但通过hotplug只打开一个核，关闭其余核。  </p>
+<h4 id="ClusterIP"><a href="#ClusterIP" class="headerlink" title="ClusterIP"></a>ClusterIP</h4><p><img src="/img/practice-tx-k8s-2/3.jpg"></p>
+<p>这里LB节点(左边的Node)采用SA2 1核1G机型。  </p>
+<h3 id="测量结果"><a href="#测量结果" class="headerlink" title="测量结果"></a>测量结果</h3><p><img src="/img/practice-tx-k8s-2/4.jpg"></p>
+<p><img src="/img/practice-tx-k8s-2/5.jpg"></p>
+<p>IPVS-BPF模式相对IPVS模式，NodePort短连接性能提高了64%，ClusterIP短连接性能提高了40%。</p>
+<p>NodePort优化效果更明显，是因为NodePort需要SNAT，而我们的eBPF SNAT比iptables SNAT更高效，所以性能提升更多。</p>
+<p><img src="/img/practice-tx-k8s-2/6.jpg"></p>
+<p>如上图所示，iperf带宽测试中IPVS-BPF模式相对IPVS mode性能提升了22%。</p>
+<p><img src="/img/practice-tx-k8s-2/7.jpg"></p>
+<p>上图中，wrk测试表明NodePort 短连接p99延迟降低了47%。</p>
+<p><img src="/img/practice-tx-k8s-2/8.jpg"></p>
+<p>上图中，wrk测试表明ClusterIP短连接的p99延迟降低了31%。</p>
+<h4 id="指令数和CPI"><a href="#指令数和CPI" class="headerlink" title="指令数和CPI"></a>指令数和CPI</h4><p><img src="/img/practice-tx-k8s-2/9.jpg"></p>
+<p>上图中从Perf工具看，平均每个请求耗费的CPU指令数，IPVS-BPF模式下降了38%。这也是性能提升的最主要原因。</p>
+<p><img src="/img/practice-tx-k8s-2/10.jpg"></p>
+<p>IPVS-BPF 模式下CPI略有增加，大概16%。</p>
+<h4 id="测试总结"><a href="#测试总结" class="headerlink" title="测试总结"></a>测试总结</h4><table>
+<thead>
+<tr>
+<th align="center">Service类型</th>
+<th align="center">短连接cps</th>
+<th align="center">短连接p99延迟</th>
+<th align="center">长连接吞吐</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">clusterIP</td>
+<td align="center">+40%</td>
+<td align="center">-31%</td>
+<td align="center">无，见下文</td>
+</tr>
+<tr>
+<td align="center">nodePort</td>
+<td align="center">+64%</td>
+<td align="center">-47%</td>
+<td align="center">+22%</td>
+</tr>
+</tbody></table>
+<p>如上表，IPVS-BPF模式相对原生IPVS模式，Nodeport处理短连接性能提升了64%，p99延迟降低了47%，处理长连接带宽提升了22%；ClusterIP处理短连接吞吐量提升了40%, p99延迟降低了31%。</p>
+<p>测试ClusterIP长连接吞吐时，iperf本身消耗了99% 的CPU，使得优化效果不容易直接测量。另外我们还发现IPVS-BPF模式下CPI有增加，值得进一步研究。</p>
+<h2 id="四、其他优化，特性限制和后续工作"><a href="#四、其他优化，特性限制和后续工作" class="headerlink" title="四、其他优化，特性限制和后续工作"></a>四、其他优化，特性限制和后续工作</h2><h3 id="在开发IPVS-BPF方案过程中，顺便解决或优化了一些其他问题"><a href="#在开发IPVS-BPF方案过程中，顺便解决或优化了一些其他问题" class="headerlink" title="在开发IPVS-BPF方案过程中，顺便解决或优化了一些其他问题"></a>在开发IPVS-BPF方案过程中，顺便解决或优化了一些其他问题</h3><ul>
+<li><p>conn_reuse_mode &#x3D; 1时新建性能低[5]以及no route to host问题[6]   这个问题是当client发起大量新建TCP连接时，新的连接被转发到terminating的Pod上，导致持续丢包。此问题在IPVS conn_reuse_mode&#x3D;1的情况下不会有。但是conn_reuse_mode&#x3D;1时，有另外的新建连接性能急剧下降的bug, 故一般都设置成了conn_reuse_mode&#x3D;0。我们在TencentOS内核中彻底修复了该问题，代码在ef8004f8[7], 8ec35911[8], 07a6e5ff63[9] 同时也正在向内核社区提交修复。</p>
+</li>
+<li><p>DNS解析偶尔5s延时[10]   iptables SNAT分配lport到调用插入nf_conntrack，这中间是采用乐观锁机制。这中间如果发生竞争，相同的lport和五元组同时插入nf_conntrack会导致丢包。在IPVS-BPF模式下，SNAT选择lport的过程和插入hash table的过程在同一个循环中，循环次数最大为5次，从而减少了该问题的概率。</p>
+</li>
+<li><p>externalIP优化[11]造成clb健康检查失败问题</p>
+<p>详情见：<a target="_blank" rel="noopener" href="https://github.com/kubernetes/kubernetes/issues/79783#issuecomment-509007864">https://github.com/kubernetes/kubernetes/issues/79783#issuecomment-509007864</a></p>
+</li>
+</ul>
+<h3 id="特性限制"><a href="#特性限制" class="headerlink" title="特性限制"></a>特性限制</h3><ul>
+<li>Pod访问自身所在的service，IPVS-BPF模式会把请求转发给其他pod，不会把请求转发给Pod自己</li>
+</ul>
+<h3 id="后续工作"><a href="#后续工作" class="headerlink" title="后续工作"></a>后续工作</h3><ul>
+<li>借鉴Cilium提出的方法，利用eBPF进一步优化clusterIP性能</li>
+<li>研究IPVS-BPF模式下CPI上升的原因，探索进一步提升性能的可能性</li>
+</ul>
+<h2 id="五、如何在TKE启用IPVS-BPF模式"><a href="#五、如何在TKE启用IPVS-BPF模式" class="headerlink" title="五、如何在TKE启用IPVS-BPF模式"></a>五、如何在TKE启用IPVS-BPF模式</h2><p>如下图，在腾讯云TKE控制台[12]创建集群时，<code>高级设置</code>下的<code>Kube-proxy代理模式</code>选项，选择 <code>ipvs-bpf</code>即可。</p>
+<p><img src="/img/practice-tx-k8s-2/11.jpg"></p>
+<p>目前该特性需要申请白名单。请通过申请页[13]提交申请。</p>
+<h2 id="六、相关专利"><a href="#六、相关专利" class="headerlink" title="六、相关专利"></a>六、相关专利</h2><p>本产品产生的相关专利申请如下：</p>
+<p>2019050831CN 一种报文传输的方法及相关装置 </p>
+<p>2019070906CN 负载均衡方法、装置、设备及存储介质</p>
+<p>2020030535CN 一种利用eBPF技术探测网络服务应用闲置的方法 </p>
+<p>2020040017CN 宿主机实时负载感知的自适应的负载均衡调度算法</p>
+<h3 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h3><p>[1] Kubernetes Service: <em><a target="_blank" rel="noopener" href="https://kubernetes.io/docs/concepts/services-networking/service/">https://kubernetes.io/docs/concepts/services-networking/service/</a></em></p>
+<p>[2] 腾讯TKE: <em><a target="_blank" rel="noopener" href="https://cloud.tencent.com/product/tke">https://cloud.tencent.com/product/tke</a></em></p>
+<p>[3] eBPF: <em><a target="_blank" rel="noopener" href="https://lwn.net/Articles/740157/">https://lwn.net/Articles/740157/</a></em></p>
+<p>[4] QCon在线会议: <em><a target="_blank" rel="noopener" href="https://qcon.infoq.cn/2020/beijing/presentation/2321">https://qcon.infoq.cn/2020/beijing/presentation/2321</a></em></p>
+<p>[5] conn_reuse_mode &#x3D; 1时新建性能低: <em><a target="_blank" rel="noopener" href="https://github.com/kubernetes/kubernetes/issues/81775">https://github.com/kubernetes/kubernetes/issues/81775</a></em></p>
+<p>[6] no route to host问题: <em><a target="_blank" rel="noopener" href="https://tencentcloudcontainerteam.github.io/2019/12/15/no-route-to-host/">https://tencentcloudcontainerteam.github.io/2019/12/15/no-route-to-host/</a></em></p>
+<p>[7] ef8004f8: <em><a target="_blank" rel="noopener" href="https://github.com/Tencent/TencentOS-kernel/commit/ef8004f8fe7d46e758955799a41cc9d66fa1ae34">https://github.com/Tencent/TencentOS-kernel/commit/ef8004f8fe7d46e758955799a41cc9d66fa1ae34</a></em></p>
+<p>[8] 8ec35911: <em><a target="_blank" rel="noopener" href="https://github.com/Tencent/TencentOS-kernel/commit/8ec35911f7c5e1cb29059c18d42cf3aec4fcc673">https://github.com/Tencent/TencentOS-kernel/commit/8ec35911f7c5e1cb29059c18d42cf3aec4fcc673</a></em></p>
+<p>[9] 07a6e5ff63: <em><a target="_blank" rel="noopener" href="https://github.com/Tencent/TencentOS-kernel/commit/07a6e5ff63a74efcca67d496f6ac8126f1f114ff">https://github.com/Tencent/TencentOS-kernel/commit/07a6e5ff63a74efcca67d496f6ac8126f1f114ff</a></em></p>
+<p>[10] DNS解析偶尔5s延时: <em><a target="_blank" rel="noopener" href="https://tencentcloudcontainerteam.github.io/2018/10/26/DNS-5-seconds-delay/">https://tencentcloudcontainerteam.github.io/2018/10/26/DNS-5-seconds-delay/</a></em></p>
+<p>[11] externalIP优化: <em><a target="_blank" rel="noopener" href="https://github.com/kubernetes/kubernetes/pull/63066">https://github.com/kubernetes/kubernetes/pull/63066</a></em></p>
+<p>[12] 腾讯云TKE控制台: <em><a target="_blank" rel="noopener" href="https://console.cloud.tencent.com/tke2/cluster/?rid=16">https://console.cloud.tencent.com/tke2/cluster\?rid=16</a></em></p>
+<p>[13] 申请页: <em><a target="_blank" rel="noopener" href="https://cloud.tencent.com/apply/p/iwezhfpubqi">https://cloud.tencent.com/apply/p/iwezhfpubqi</a></em></p>
+<article class="message message-immersive is-primary">
+<div class="message-body">
+<i class="fas fa-globe-asia mr-2"></i>本文来自
+<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/VCIDNT_JR97SV0axsCUbgw">腾讯云原生</a>.
+</div>
+</article>
+    </div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/Kubernetes/">Kubernetes</a></div><!--!--><div><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6757924689439593" crossOrigin="anonymous"></script><ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-6757924689439593" data-ad-slot="2352785969"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div></article></div><!--!--><nav class="post-navigation mt-4 level is-mobile"><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/pages/how-create-pod-with-cri/"><span class="level-item">一文了解CRI通过Containerd创建Pod的过程</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--><div style="width:100%"><script src="https://giscus.app/client.js" data-repo="thetechstack/thetechstack.github.io" data-repo-id="R_kgDOG6Ti1Q" data-category="Announcements" data-category-id="DIC_kwDOG6Ti1c4COQtm" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light" data-lang="zh-CN" crossOrigin="anonymous" async></script></div></div><!--!--><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen  order-3 is-sticky"><div class="card widget" id="toc" data-type="toc"><div class="card-content"><div class="menu"><h3 class="menu-label">目录</h3><ul class="menu-list"><li><a class="level is-mobile" href="#一、容器网络现状"><span class="level-left"><span class="level-item">1</span><span class="level-item">一、容器网络现状</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#iptables模式"><span class="level-left"><span class="level-item">1.1</span><span class="level-item">iptables模式</span></span></a></li><li><a class="level is-mobile" href="#IPVS模式"><span class="level-left"><span class="level-item">1.2</span><span class="level-item">IPVS模式</span></span></a></li></ul></li><li><a class="level is-mobile" href="#二、IPVS-BPF方案介绍"><span class="level-left"><span class="level-item">2</span><span class="level-item">二、IPVS-BPF方案介绍</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#eBPF-介绍"><span class="level-left"><span class="level-item">2.1</span><span class="level-item">eBPF 介绍</span></span></a></li><li><a class="level is-mobile" href="#基于eBPF的IPVS-BPF优化方案"><span class="level-left"><span class="level-item">2.2</span><span class="level-item">基于eBPF的IPVS-BPF优化方案</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#优化前后报文处理流程的对比"><span class="level-left"><span class="level-item">2.2.1</span><span class="level-item">优化前后报文处理流程的对比</span></span></a></li></ul></li><li><a class="level is-mobile" href="#为什么不直接采用全eBPF方式"><span class="level-left"><span class="level-item">2.3</span><span class="level-item">为什么不直接采用全eBPF方式</span></span></a></li></ul></li><li><a class="level is-mobile" href="#三、性能测量"><span class="level-left"><span class="level-item">3</span><span class="level-item">三、性能测量</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#测试环境"><span class="level-left"><span class="level-item">3.1</span><span class="level-item">测试环境</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#NodePort"><span class="level-left"><span class="level-item">3.1.1</span><span class="level-item">NodePort</span></span></a></li><li><a class="level is-mobile" href="#ClusterIP"><span class="level-left"><span class="level-item">3.1.2</span><span class="level-item">ClusterIP</span></span></a></li></ul></li><li><a class="level is-mobile" href="#测量结果"><span class="level-left"><span class="level-item">3.2</span><span class="level-item">测量结果</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#指令数和CPI"><span class="level-left"><span class="level-item">3.2.1</span><span class="level-item">指令数和CPI</span></span></a></li><li><a class="level is-mobile" href="#测试总结"><span class="level-left"><span class="level-item">3.2.2</span><span class="level-item">测试总结</span></span></a></li></ul></li></ul></li><li><a class="level is-mobile" href="#四、其他优化，特性限制和后续工作"><span class="level-left"><span class="level-item">4</span><span class="level-item">四、其他优化，特性限制和后续工作</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#在开发IPVS-BPF方案过程中，顺便解决或优化了一些其他问题"><span class="level-left"><span class="level-item">4.1</span><span class="level-item">在开发IPVS-BPF方案过程中，顺便解决或优化了一些其他问题</span></span></a></li><li><a class="level is-mobile" href="#特性限制"><span class="level-left"><span class="level-item">4.2</span><span class="level-item">特性限制</span></span></a></li><li><a class="level is-mobile" href="#后续工作"><span class="level-left"><span class="level-item">4.3</span><span class="level-item">后续工作</span></span></a></li></ul></li><li><a class="level is-mobile" href="#五、如何在TKE启用IPVS-BPF模式"><span class="level-left"><span class="level-item">5</span><span class="level-item">五、如何在TKE启用IPVS-BPF模式</span></span></a></li><li><a class="level is-mobile" href="#六、相关专利"><span class="level-left"><span class="level-item">6</span><span class="level-item">六、相关专利</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#参考资料"><span class="level-left"><span class="level-item">6.1</span><span class="level-item">参考资料</span></span></a></li></ul></li></ul></div></div><style>#toc .menu-list > li > a.is-active + .menu-list { display: block; }#toc .menu-list > li > a + .menu-list { display: none; }</style><script src="/js/toc.js" defer></script></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/CPython/"><span class="tag">CPython</span><span class="tag">5</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Feed%E6%9C%8D%E5%8A%A1/"><span class="tag">Feed服务</span><span class="tag">3</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Knative/"><span class="tag">Knative</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Kubernetes/"><span class="tag">Kubernetes</span><span class="tag">25</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Linux%E7%BD%91%E7%BB%9C/"><span class="tag">Linux网络</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Python/"><span class="tag">Python</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Serverless/"><span class="tag">Serverless</span><span class="tag">5</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Yarn/"><span class="tag">Yarn</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E4%B8%80%E8%87%B4%E6%80%A7/"><span class="tag">分布式一致性</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%9C%A8%E7%A6%BB%E7%BA%BF%E6%B7%B7%E9%83%A8/"><span class="tag">在离线混部</span><span class="tag">4</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/"><span class="tag">大数据</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%97%B6%E9%97%B4%E5%BA%8F%E5%88%97/"><span class="tag">时间序列</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%99%BA%E8%83%BD%E8%BF%90%E7%BB%B4/"><span class="tag">智能运维</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BC%96%E8%AF%91%E5%8E%9F%E7%90%86/"><span class="tag">编译原理</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E8%99%9A%E6%8B%9F%E5%8C%96/"><span class="tag">网络虚拟化</span><span class="tag">3</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%99%9A%E6%8B%9F%E6%9C%BA/"><span class="tag">虚拟机</span><span class="tag">2</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AF%AD%E8%A8%80%E7%89%B9%E6%80%A7/"><span class="tag">语言特性</span><span class="tag">2</span></a></div></div></div></div></div><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg"></figure><p class="is-size-6 is-block">公众号：面向问题编程</p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives"><p class="title">68</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories"><p class="title">5</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags"><p class="title">17</p></a></div></div></nav></div></div><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/"><span class="level-start"><span class="level-item">一文了解</span></span><span class="level-end"><span class="level-item tag">29</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E5%AE%9E%E8%B7%B5/"><span class="level-start"><span class="level-item">技术实践</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/"><span class="level-start"><span class="level-item">技术架构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BB%BC%E8%BF%B0/"><span class="level-start"><span class="level-item">综述</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E9%97%AE%E9%A2%98/"><span class="level-start"><span class="level-item">问题</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li></ul></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a><p class="is-size-7"><span>&copy; 2022 面向问题编程</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-CN");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/lg-zoom@1.3.0/dist/lg-zoom.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script type="text/x-mathjax-config">MathJax.Hub.Config({
+            'HTML-CSS': {
+                matchFontHeight: false
+            },
+            SVG: {
+                matchFontHeight: false
+            },
+            CommonHTML: {
+                matchFontHeight: false
+            },
+            tex2jax: {
+                inlineMath: [
+                    ['$','$'],
+                    ['\\(','\\)']
+                ]
+            }
+        });</script><script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.9/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script><!--!--><!--!--><!--!--><script src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script src="/js/insight.js" defer></script><script>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script></body></html>

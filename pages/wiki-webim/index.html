@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><title>一文了解Web即时通信WebIM - 面向问题编程</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="面向问题编程"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="面向问题编程"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="什么是IM IM（Instant Messaging）即时通信，是一种通过网络进行实时通信的系统，允许两人或多人使用网络即时的传递文字消息、文件、语音与视频交流，通常以网站、软件或者移动app的方式提供服务。自从互联网的兴起，IM就一直和我们的生活息息相关，日常聊天、工作、打车、外卖、购物等等，可以说，我们现在的生活已经几乎离不开IM。"><meta property="og:type" content="blog"><meta property="og:title" content="一文了解Web即时通信WebIM"><meta property="og:url" content="https://www.heapoverflow.cn/pages/wiki-webim/"><meta property="og:site_name" content="面向问题编程"><meta property="og:description" content="什么是IM IM（Instant Messaging）即时通信，是一种通过网络进行实时通信的系统，允许两人或多人使用网络即时的传递文字消息、文件、语音与视频交流，通常以网站、软件或者移动app的方式提供服务。自从互联网的兴起，IM就一直和我们的生活息息相关，日常聊天、工作、打车、外卖、购物等等，可以说，我们现在的生活已经几乎离不开IM。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://www.heapoverflow.cn/img/wiki-webim/1.jpg"><meta property="article:published_time" content="2022-04-06T14:35:57.763Z"><meta property="article:modified_time" content="2022-04-06T14:39:05.995Z"><meta property="article:author" content="面向问题编程"><meta property="twitter:card" content="summary"><meta property="twitter:image" content="/img/wiki-webim/1.jpg"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.heapoverflow.cn/pages/wiki-webim/"},"headline":"一文了解Web即时通信WebIM","image":["https://www.heapoverflow.cn/img/wiki-webim/1.jpg"],"datePublished":"2022-04-06T14:35:57.763Z","dateModified":"2022-04-06T14:39:05.995Z","author":{"@type":"Person","name":"面向问题编程"},"publisher":{"@type":"Organization","name":"面向问题编程","logo":{"@type":"ImageObject","url":"https://www.heapoverflow.cn/img/logo.svg"}},"description":"什么是IM IM（Instant Messaging）即时通信，是一种通过网络进行实时通信的系统，允许两人或多人使用网络即时的传递文字消息、文件、语音与视频交流，通常以网站、软件或者移动app的方式提供服务。自从互联网的兴起，IM就一直和我们的生活息息相关，日常聊天、工作、打车、外卖、购物等等，可以说，我们现在的生活已经几乎离不开IM。"}</script><link rel="canonical" href="https://www.heapoverflow.cn/pages/wiki-webim/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><script src="https://www.googletagmanager.com/gtag/js?id=G-ETGL163DQH" async></script><script>window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    
+        gtag('config', 'G-ETGL163DQH');</script><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><script data-ad-client="ca-pub-6757924689439593" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+          Array
+              .from(document.querySelectorAll('.tab-content'))
+              .forEach($tab => {
+                  $tab.classList.add('is-hidden');
+              });
+          Array
+              .from(document.querySelectorAll('.tabs li'))
+              .forEach($tab => {
+                  $tab.classList.remove('is-active');
+              });
+          const $activeTab = document.querySelector(location.hash);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+          const $tabMenu = document.querySelector(`a[href="${location.hash}"]`);
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 6.0.0"></head><body class="is-2-column"><nav class="navbar navbar-main"><div class="container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/categories/%E9%97%AE%E9%A2%98/">问题</a><a class="navbar-item" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/">技术架构</a><a class="navbar-item" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></div><div class="navbar-end"><a class="navbar-item" rel="noopener" title="分类" href="/categories">分类</a><a class="navbar-item" rel="noopener" title="标签" href="/tags">标签</a><a class="navbar-item" rel="noopener" title="归档" href="/archives">归档</a><a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;"><i class="fas fa-list-ul"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-9-widescreen"><div class="card"><div class="card-image"><span class="image is-7by3"><img class="fill" src="/img/wiki-webim/1.jpg" alt="一文了解Web即时通信WebIM"></span></div><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-04-06T14:35:57.763Z" title="2022/4/6 下午10:35:57">2022-04-06</time>发表</span><span class="level-item"><time dateTime="2022-04-06T14:39:05.995Z" title="2022/4/6 下午10:39:05">2022-04-06</time>更新</span><span class="level-item"><a class="link-muted" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></span><span class="level-item">22 分钟读完 (大约3254个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">一文了解Web即时通信WebIM</h1><div class="content"><h3 id="什么是IM"><a href="#什么是IM" class="headerlink" title="什么是IM"></a>什么是IM</h3><blockquote>
+<p>IM（Instant Messaging）即时通信，是一种通过网络进行实时通信的系统，允许两人或多人使用网络即时的传递文字消息、文件、语音与视频交流，通常以网站、软件或者移动app的方式提供服务。自从互联网的兴起，IM就一直和我们的生活息息相关，日常聊天、工作、打车、外卖、购物等等，可以说，我们现在的生活已经几乎离不开IM。</p>
+</blockquote>
+<span id="more"></span>
+
+<h3 id="IM历史"><a href="#IM历史" class="headerlink" title="IM历史"></a>IM历史</h3><p>最早人们的通信靠的是邮件，需要人去邮局寄信，然后邮递员再经过漫长的旅程送达对方。从前车马很慢，一生只够爱一个人，咳咳。从邮件到传呼机再到有线电话，无线电话，最后随着互联网的发展IM迎来了它的新生。</p>
+<p>最早的即时通信软件叫做ICQ，他是四名以色列青年于1996年7月成立的Mirabilis公司推出的产品。然后腾讯接着推出了OICQ。</p>
+<p><img src="/img/wiki-webim/1.jpg"></p>
+<p>图片取自网络</p>
+<p>以及现在主流的聊天应用</p>
+<ul>
+<li>Whatsapp 美国</li>
+<li>Line 日本</li>
+<li>Kakao Talk 韩国</li>
+<li>WeChat 中国</li>
+<li>Facebook Messenger 美国</li>
+</ul>
+<h3 id="IM特性"><a href="#IM特性" class="headerlink" title="IM特性"></a>IM特性</h3><p>IM的四大特性，有效性、实时性、一致性以及安全性，这四点可以总结为两个字，<code>可靠</code>，那么如何实现一个可靠的Web IM应用呢？业界其实已有很成熟的IM的方案，我们会从通信协议、应用层、通信数据格式、以及相应策略方面给大家阐述一个可靠的IM应用都需要哪些东西。</p>
+<h3 id="IM通信协议"><a href="#IM通信协议" class="headerlink" title="IM通信协议"></a>IM通信协议</h3><p>为了保证可靠，传输层我们一般使用TCP协议，它是面向连接，可靠的流协议，实行“顺序控制”和“重发机制”，还有“流（流量）控制”、“拥塞控制”、提高网络利用率等众多功能。</p>
+<p>在PC的早期时代，IM采用的是http短轮询的模式（图1），它会定期、高频地轮询服务器端消息。</p>
+<p><img src="/img/wiki-webim/2.jpg"></p>
+<p>图1</p>
+<p>它的缺点也很明显，会有大量无用的请求，用户端也会非常耗电耗流量，而服务端面对高频QPS，内存资源压力也会非常大</p>
+<p>对于短轮询的优化，就出现了长轮询（图2）。相对短轮询，它大幅降低了无用轮询导致的网络与功耗开销，但是服务端悬挂住请求，只是降低了入口请求的QPS，并没有降低服务器的资源开销，假如有1000个请求在等待，那就意味着有1000个线程挂起，被轮询占用消息存储资源。</p>
+<p><img src="/img/wiki-webim/3.jpg"></p>
+<p>图2</p>
+<p>为了更好的解决实时性问题，IM领域经历过几次技术的迭代升级，从简单、低效的短轮询逐步升级到相对效率可控的长轮询，然后随着h5的出现，<code>全双工（Full-duplex）</code>的websocket（图3）彻底解决了服务端推送的问题。用户侧和服务端利用websocket建立长连接后，双方就可以同时进行双向的数据传输了。</p>
+<p><img src="/img/wiki-webim/4.jpg"></p>
+<p>图3</p>
+<p>服务器的压力也不再是连接数，而是每一条消息事物。</p>
+<h3 id="应用层可靠"><a href="#应用层可靠" class="headerlink" title="应用层可靠"></a>应用层可靠</h3><p>在底层协议的保障后，我们的消息就完全可靠了吗？那肯定不是，我们的服务大致是这样的，用户发送消息给服务端，服务端存储消息，再返回给用户，并把该条消息推给另一个用户，在下图（图4）流程中，每个环节都可能存在消息丢失的风险。</p>
+<ul>
+<li>用户1发送到IM服务的过程中</li>
+<li>IM服务器存储失败</li>
+<li>用户1等待服务器响应超时</li>
+<li>服务器往用户2推送消息时超时、错误</li>
+</ul>
+<p><img src="/img/wiki-webim/5.jpg"></p>
+<p>图4</p>
+<h4 id="ack机制"><a href="#ack机制" class="headerlink" title="ack机制"></a>ack机制</h4><p>为了解决用户1到服务端的可靠性问题，我们参考TCP协议的握手、重传机制，来保障应用层消息的可靠性，在发送消息后会有一个定时超时，在超时后根据需要，从ack队列中取出消息重推（图5）。一般情况显示发送失败，交由用户手动重发（比如消息左边一个红色感叹号）。</p>
+<p><img src="/img/wiki-webim/6.jpg"></p>
+<p>图5</p>
+<p>用户发送消息，服务端收到消息后，生成该条消息的唯一id，以ack的形式回传给用户侧，用户侧再更新该条消息id值，后续IM功能中的撤回，去重 ，重发等逻辑都会用到该id。</p>
+<h4 id="重发与去重机制"><a href="#重发与去重机制" class="headerlink" title="重发与去重机制"></a>重发与去重机制</h4><p>在服务端推送消息时，如出错或超时，会有相应的重发机制。比如，设置错误或超时重试三次。</p>
+<p>有时因为一些网络或其他情况。服务端会有相应的重发逻辑，在推送消息出现重发时，用户端设置对应的去重逻辑。我们会对消息列表的最新的5条消息进行排序和去重。只取最新5条主要考虑到排序与去重的效率，用户的焦点主要在最新的几条消息，如果因为一些网络原因在消息列表较远处插入消息，会造成用户的困惑与遗漏，另外5条消息的时间差基本满足大多数异常情况的消息丢失场景。如果还有消息遗漏的情况，用户在刷新消息列表时会以http的形式拉取历史消息（当前会话的消息）。</p>
+<h4 id="断线重连（Qos机制）"><a href="#断线重连（Qos机制）" class="headerlink" title="断线重连（Qos机制）"></a>断线重连（Qos机制）</h4><p>websocket 有error和close事件，我们在监听这两个事件后进行相应的重连逻辑，其中在close事件里不对状态码1000（正常关闭）做重连处理。</p>
+<p>具体逻辑如下</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * reconnect</span></span><br><span class="line"><span class="comment">   * @param &#123;String&#125; wsurl websocket server location</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  reconnect(wsurl) &#123;</span><br><span class="line">    <span class="keyword">if</span> (this._reconnectingLock) <span class="keyword">return</span></span><br><span class="line">    this._reconnectingLock = <span class="literal">true</span></span><br><span class="line">    this._ws.close()</span><br><span class="line"></span><br><span class="line">    let delayTime = Math.<span class="built_in">pow</span>(<span class="number">2</span>, this._reconnectCount++) - <span class="number">1</span></span><br><span class="line">    delayTime = delayTime &gt; <span class="number">30</span> ? <span class="number">30</span> : delayTime</span><br><span class="line">    console.info(`delay $&#123;delayTime&#125;s...`)</span><br><span class="line"></span><br><span class="line">    setTimeout(() =&gt; &#123;</span><br><span class="line">      console.info(`try $&#123;this._reconnectCount&#125; time reconnect...`)</span><br><span class="line">      this.create(wsurl)</span><br><span class="line">      this._reconnectingLock = <span class="literal">false</span></span><br><span class="line">    &#125;, delayTime * <span class="number">1000</span> + <span class="number">100</span>)</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+
+<p>首先我们有个重连锁，在正在进行重连时不重复触发重连逻辑，在保证ws完全关闭的情况下，会以重连次数的二次幂作为重连的时间间隔，并且在重试时间达到30s后不再递增。这样处理的逻辑一是为了保证在断线或者异常时能马上进行重连的尝试，但是会逐渐减缓重连尝试，假如是服务器负载等问题造成的断开，也避免一直频繁连接给服务器造成压力。</p>
+<h4 id="消息就不会丢了吗"><a href="#消息就不会丢了吗" class="headerlink" title="消息就不会丢了吗"></a>消息就不会丢了吗</h4><p>我们的ack+超时重传+消息去重，能解决大部分消息推送丢失的问题，但比如服务器宕机，电脑手机息屏，手机切换后台等等造成连接断开，通道不可用（图6）。服务端在这个期间推送消息，那如何保证用户能收到完整的消息？</p>
+<p><img src="/img/wiki-webim/7.jpg"></p>
+<p>图6</p>
+<p>一般在这个时候，我们会在重连或者用户窗口可视时对消息进行完整性检查，会以http的形式拉取这段时间的消息，以最后一条消息的时间戳作为参数拉取这个时间段的消息，或者拉取后端会话（session）维度的消息。</p>
+<h4 id="心跳机制"><a href="#心跳机制" class="headerlink" title="心跳机制"></a>心跳机制</h4><p>websocket的连接是无感知的虚拟连接，中间链路出现一些异常情况断开时两边不会感知到，为了保证服务的可靠性，以及降低服务器的开销，我们会有对应的心跳机制（图7），来检测连接是否正常，从而保持连接高可用。</p>
+<p><img src="/img/wiki-webim/8.jpg"></p>
+<p>图7</p>
+<p>在心跳的基础上，能及时支持客户端的心跳断线重连，比如两次心跳没有ack，或者心跳超时没有收到ack（图8）。</p>
+<p><img src="/img/wiki-webim/9.jpg"></p>
+<p>图8</p>
+<p>心跳除了用于重连，还可用于及时释放服务器以及业务资源，取决于IM的场景与策略。比如一些客服聊天场景，客服要尽可能接待更多的用户，为及时释放客服资源，服务端在用户达到固定未收到心跳时间，及时断开客服聊天，释放相应资源。</p>
+<p>除此之外，心跳还有连接保活的功能。有时会遇到NAT(Network Address Translator)超时的情况。运营商维护NAT映射表时，为了节约资源和降低 自身网关压力，会定时清除没有数据收发的连接，具体不在这里详情阐述。但这个过程服务端和用户端都无法感知，从而会影响消息收发。下图（图9）是一些运营商的NAT超时时间</p>
+<p><img src="/img/wiki-webim/10.jpg"></p>
+<p>图9</p>
+<h4 id="常用心跳方案"><a href="#常用心跳方案" class="headerlink" title="常用心跳方案"></a>常用心跳方案</h4><ul>
+<li>TCP keepalive</li>
+<li>应用层心跳</li>
+<li>智能心跳</li>
+</ul>
+<p>TCP的keepalive 作为系统层TCP&#x2F;IP协议的已有实现，操作系统默认是关闭的，需要应用层开启，默认配置项周期是2小时，失败后重试9次，超时75s，但是灵活性较差，所以我们一般不采用。应用层心跳能灵活控制，更能结合业务，具体策略如下图（图10）</p>
+<p><img src="/img/wiki-webim/11.jpg"></p>
+<p>图10</p>
+<p>心跳的发送间隔，最简单的就是采用固定心跳时间，另外由于NAT超时时间以及网络环境切换的不确定性，会有一些智能心跳方案，这里分享一下安卓版微信的智能心跳方案。</p>
+<ul>
+<li>[MinHeat, MaxHeart]–心跳可选区间</li>
+<li>successHeart–当前成功心跳</li>
+<li>curHeart–当前心跳，初始值successHeart</li>
+<li>heartStep—心跳增加步长</li>
+<li>successStep—稳定期后的探测步长</li>
+</ul>
+<p><img src="/img/wiki-webim/12.jpg"><img src="/img/wiki-webim/13.jpg"></p>
+<h3 id="消息协议"><a href="#消息协议" class="headerlink" title="消息协议"></a>消息协议</h3><p>好，通信上已经基本没有问题了，有了上述的策略后，IM的消息通信就基本能满足大多数场景了，现在是消息协议的选型，也就是通信的数据格式，我们需要考虑的点有以下。</p>
+<ul>
+<li>网络数据大小：占用带宽，传输效率</li>
+<li>网络数据安全性：敏感数据的网络安全</li>
+<li>编码复杂度</li>
+<li>协议通用性、大众规范</li>
+</ul>
+<p>业界常用的数据格式有以下</p>
+<ul>
+<li>XMPP</li>
+<li>Protobuf（Protocol Buffer）</li>
+<li>JSON</li>
+<li>私有二进制</li>
+<li>MQTT</li>
+<li>定制化XML</li>
+</ul>
+<p>一般我们会选择Protobuf，它是Google公司内部的混合语言数据标准，用pb序列化后的大小是json的10分之一，xml格式的20分之一，是二进制序列化的10分之一，并且基本上主流语言都已支持。不过考虑到上手的简单以及易调试，json也不是一个很坏的选择，毕竟现在http的数据基本都是json，明文的数据包在调试上也会方便许多。</p>
+<h3 id="创建websocekt实例"><a href="#创建websocekt实例" class="headerlink" title="创建websocekt实例"></a>创建websocekt实例</h3><p>websocket现在主流浏览器早已支持很久，并且在移动端也基本没有兼容性问题，官方提供的API十分简单，具体不在这里阐述，基本就四个事件，我们上述说到的功能都可以基于这四个事件去做。</p>
+<p><img src="/img/wiki-webim/14.jpg"></p>
+<h3 id="展望"><a href="#展望" class="headerlink" title="展望"></a>展望</h3><p>IM需要考虑的还有很多，不仅是前端，还有更多的是与服务端配合的策略。其他的还有一些IM里面常用功能，比如撤回、已读未读，以及自定义消息类型，多媒体消息之类的实现，ws降级，群组消息推送等问题，受篇幅限制，这里不再仔细展开。</p>
+<p>升华一下，人类社会发展，需要协作产出，需要沟通交流。随着5g的发展以及普及，即时通讯必然会往更广的方向延伸，并且并不局限于简单的聊天。</p>
+<article class="message message-immersive is-primary">
+<div class="message-body">
+<i class="fas fa-globe-asia mr-2"></i>本文来自
+<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/IGTirxb6Cg7c_uMrHyvhHw">大转转FE</a>.
+</div>
+</article>
+    </div><!--!--><div><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6757924689439593" crossOrigin="anonymous"></script><ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-6757924689439593" data-ad-slot="2352785969"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div></article></div><!--!--><nav class="post-navigation mt-4 level is-mobile"><div class="level-start"><a class="article-nav-prev level level-item link-muted" href="/pages/arch-taobao/"><i class="level-item fas fa-chevron-left"></i><span class="level-item">大型网站架构演进</span></a></div><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/pages/secure-container/"><span class="level-item">一文了解安全容器</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--><div style="width:100%"><script src="https://giscus.app/client.js" data-repo="thetechstack/thetechstack.github.io" data-repo-id="R_kgDOG6Ti1Q" data-category="Announcements" data-category-id="DIC_kwDOG6Ti1c4COQtm" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light" data-lang="zh-CN" crossOrigin="anonymous" async></script></div></div><!--!--><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen  order-3 is-sticky"><div class="card widget" id="toc" data-type="toc"><div class="card-content"><div class="menu"><h3 class="menu-label">目录</h3><ul class="menu-list"><li><a class="level is-mobile" href="#什么是IM"><span class="level-left"><span class="level-item">1</span><span class="level-item">什么是IM</span></span></a></li><li><a class="level is-mobile" href="#IM历史"><span class="level-left"><span class="level-item">2</span><span class="level-item">IM历史</span></span></a></li><li><a class="level is-mobile" href="#IM特性"><span class="level-left"><span class="level-item">3</span><span class="level-item">IM特性</span></span></a></li><li><a class="level is-mobile" href="#IM通信协议"><span class="level-left"><span class="level-item">4</span><span class="level-item">IM通信协议</span></span></a></li><li><a class="level is-mobile" href="#应用层可靠"><span class="level-left"><span class="level-item">5</span><span class="level-item">应用层可靠</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#ack机制"><span class="level-left"><span class="level-item">5.1</span><span class="level-item">ack机制</span></span></a></li><li><a class="level is-mobile" href="#重发与去重机制"><span class="level-left"><span class="level-item">5.2</span><span class="level-item">重发与去重机制</span></span></a></li><li><a class="level is-mobile" href="#断线重连（Qos机制）"><span class="level-left"><span class="level-item">5.3</span><span class="level-item">断线重连（Qos机制）</span></span></a></li><li><a class="level is-mobile" href="#消息就不会丢了吗"><span class="level-left"><span class="level-item">5.4</span><span class="level-item">消息就不会丢了吗</span></span></a></li><li><a class="level is-mobile" href="#心跳机制"><span class="level-left"><span class="level-item">5.5</span><span class="level-item">心跳机制</span></span></a></li><li><a class="level is-mobile" href="#常用心跳方案"><span class="level-left"><span class="level-item">5.6</span><span class="level-item">常用心跳方案</span></span></a></li></ul></li><li><a class="level is-mobile" href="#消息协议"><span class="level-left"><span class="level-item">6</span><span class="level-item">消息协议</span></span></a></li><li><a class="level is-mobile" href="#创建websocekt实例"><span class="level-left"><span class="level-item">7</span><span class="level-item">创建websocekt实例</span></span></a></li><li><a class="level is-mobile" href="#展望"><span class="level-left"><span class="level-item">8</span><span class="level-item">展望</span></span></a></li></ul></div></div><style>#toc .menu-list > li > a.is-active + .menu-list { display: block; }#toc .menu-list > li > a + .menu-list { display: none; }</style><script src="/js/toc.js" defer></script></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/CPython/"><span class="tag">CPython</span><span class="tag">5</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Feed%E6%9C%8D%E5%8A%A1/"><span class="tag">Feed服务</span><span class="tag">3</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Knative/"><span class="tag">Knative</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Kubernetes/"><span class="tag">Kubernetes</span><span class="tag">25</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Linux%E7%BD%91%E7%BB%9C/"><span class="tag">Linux网络</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Python/"><span class="tag">Python</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Serverless/"><span class="tag">Serverless</span><span class="tag">5</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Yarn/"><span class="tag">Yarn</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E4%B8%80%E8%87%B4%E6%80%A7/"><span class="tag">分布式一致性</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%9C%A8%E7%A6%BB%E7%BA%BF%E6%B7%B7%E9%83%A8/"><span class="tag">在离线混部</span><span class="tag">4</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/"><span class="tag">大数据</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%97%B6%E9%97%B4%E5%BA%8F%E5%88%97/"><span class="tag">时间序列</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%99%BA%E8%83%BD%E8%BF%90%E7%BB%B4/"><span class="tag">智能运维</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BC%96%E8%AF%91%E5%8E%9F%E7%90%86/"><span class="tag">编译原理</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E8%99%9A%E6%8B%9F%E5%8C%96/"><span class="tag">网络虚拟化</span><span class="tag">3</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%99%9A%E6%8B%9F%E6%9C%BA/"><span class="tag">虚拟机</span><span class="tag">2</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AF%AD%E8%A8%80%E7%89%B9%E6%80%A7/"><span class="tag">语言特性</span><span class="tag">2</span></a></div></div></div></div></div><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg"></figure><p class="is-size-6 is-block">公众号：面向问题编程</p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives"><p class="title">68</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories"><p class="title">5</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags"><p class="title">17</p></a></div></div></nav></div></div><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/"><span class="level-start"><span class="level-item">一文了解</span></span><span class="level-end"><span class="level-item tag">29</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E5%AE%9E%E8%B7%B5/"><span class="level-start"><span class="level-item">技术实践</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/"><span class="level-start"><span class="level-item">技术架构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BB%BC%E8%BF%B0/"><span class="level-start"><span class="level-item">综述</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E9%97%AE%E9%A2%98/"><span class="level-start"><span class="level-item">问题</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li></ul></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a><p class="is-size-7"><span>&copy; 2022 面向问题编程</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-CN");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/lg-zoom@1.3.0/dist/lg-zoom.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script type="text/x-mathjax-config">MathJax.Hub.Config({
+            'HTML-CSS': {
+                matchFontHeight: false
+            },
+            SVG: {
+                matchFontHeight: false
+            },
+            CommonHTML: {
+                matchFontHeight: false
+            },
+            tex2jax: {
+                inlineMath: [
+                    ['$','$'],
+                    ['\\(','\\)']
+                ]
+            }
+        });</script><script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.9/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script><!--!--><!--!--><!--!--><script src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script src="/js/insight.js" defer></script><script>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script></body></html>
