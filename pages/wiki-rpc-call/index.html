@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><title>一文了解RPC同步调用和异步调用 - 面向问题编程</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="面向问题编程"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="面向问题编程"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="要搞定RPC框架，RPC框架分为客户端部分与服务端部分。 RPC-client的部分又分为： （1）序列化反序列化的部分（上图中的1、4） （2）发送字节流与接收字节流的部分（上图中的2、3）"><meta property="og:type" content="blog"><meta property="og:title" content="一文了解RPC同步调用和异步调用"><meta property="og:url" content="https://www.heapoverflow.cn/pages/wiki-rpc-call/"><meta property="og:site_name" content="面向问题编程"><meta property="og:description" content="要搞定RPC框架，RPC框架分为客户端部分与服务端部分。 RPC-client的部分又分为： （1）序列化反序列化的部分（上图中的1、4） （2）发送字节流与接收字节流的部分（上图中的2、3）"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://www.heapoverflow.cn/img/wiki-rpc-call/0.jpg"><meta property="article:published_time" content="2022-04-07T12:09:57.730Z"><meta property="article:modified_time" content="2022-04-07T12:45:10.621Z"><meta property="article:author" content="面向问题编程"><meta property="article:tag" content="RPC"><meta property="twitter:card" content="summary"><meta property="twitter:image" content="/img/wiki-rpc-call/0.jpg"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.heapoverflow.cn/pages/wiki-rpc-call/"},"headline":"一文了解RPC同步调用和异步调用","image":["https://www.heapoverflow.cn/img/wiki-rpc-call/0.jpg"],"datePublished":"2022-04-07T12:09:57.730Z","dateModified":"2022-04-07T12:45:10.621Z","author":{"@type":"Person","name":"面向问题编程"},"publisher":{"@type":"Organization","name":"面向问题编程","logo":{"@type":"ImageObject","url":"https://www.heapoverflow.cn/img/logo.svg"}},"description":"要搞定RPC框架，RPC框架分为客户端部分与服务端部分。 RPC-client的部分又分为： （1）序列化反序列化的部分（上图中的1、4） （2）发送字节流与接收字节流的部分（上图中的2、3）"}</script><link rel="canonical" href="https://www.heapoverflow.cn/pages/wiki-rpc-call/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><script src="https://www.googletagmanager.com/gtag/js?id=G-ETGL163DQH" async></script><script>window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    
+        gtag('config', 'G-ETGL163DQH');</script><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><script data-ad-client="ca-pub-6757924689439593" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+          Array
+              .from(document.querySelectorAll('.tab-content'))
+              .forEach($tab => {
+                  $tab.classList.add('is-hidden');
+              });
+          Array
+              .from(document.querySelectorAll('.tabs li'))
+              .forEach($tab => {
+                  $tab.classList.remove('is-active');
+              });
+          const $activeTab = document.querySelector(location.hash);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+          const $tabMenu = document.querySelector(`a[href="${location.hash}"]`);
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 6.0.0"></head><body class="is-2-column"><nav class="navbar navbar-main"><div class="container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/categories/%E9%97%AE%E9%A2%98/">问题</a><a class="navbar-item" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/">技术架构</a><a class="navbar-item" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></div><div class="navbar-end"><a class="navbar-item" rel="noopener" title="分类" href="/categories">分类</a><a class="navbar-item" rel="noopener" title="标签" href="/tags">标签</a><a class="navbar-item" rel="noopener" title="归档" href="/archives">归档</a><a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;"><i class="fas fa-list-ul"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-9-widescreen"><div class="card"><div class="card-image"><span class="image is-7by3"><img class="fill" src="/img/wiki-rpc-call/0.jpg" alt="一文了解RPC同步调用和异步调用"></span></div><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-04-07T12:09:57.730Z" title="2022/4/7 下午8:09:57">2022-04-07</time>发表</span><span class="level-item"><time dateTime="2022-04-07T12:45:10.621Z" title="2022/4/7 下午8:45:10">2022-04-07</time>更新</span><span class="level-item"><a class="link-muted" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></span><span class="level-item">19 分钟读完 (大约2777个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">一文了解RPC同步调用和异步调用</h1><div class="content"><p>要搞定RPC框架，RPC框架分为客户端部分与服务端部分。</p>
+<p>RPC-client的部分又分为：</p>
+<p>（1）序列化反序列化的部分（上图中的1、4）</p>
+<p>（2）发送字节流与接收字节流的部分（上图中的2、3）</p>
+<span id="more"></span>
+
+<p>前一篇文章讨论了序列化与范序列化的细节，这一篇文章将讨论发送字节流与接收字节流的部分。</p>
+<p> 
+客户端调用又分为同步调用与异步调用</p>
+<p><strong>同步调用</strong>的代码片段为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Result = Add(Obj1, Obj2);// 得到Result之前处于阻塞状态</span><br></pre></td></tr></table></figure>
+
+<p><strong>异步调用</strong>的代码片段为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Add(Obj1, Obj2, callback);// 调用后直接返回，不等结果</span><br></pre></td></tr></table></figure>
+
+<p>处理结果通过回调得到：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">callback(Result)&#123;// 得到处理结果后会调用这个回调函数</span><br><span class="line">    …</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这两个调用方式，RPC-client里，处理方式也不一样，下文逐一叙述。</p>
+<p> </p>
+<h2 id="RPC-client同步调用"><a href="#RPC-client同步调用" class="headerlink" title="RPC-client同步调用"></a><strong>RPC-client同步调用</strong></h2><p><img src="/img/wiki-rpc-call/1.jpg"><br>所谓同步调用，在得到结果之前，一直处于阻塞状态，会一直占用一个工作线程，上图简单的说明了一下组件、交互、流程步骤。  </p>
+<p> 
+上图中的<strong>左边大框</strong>，就代表了调用方的一个工作线程。</p>
+<p><strong>左边粉色中框</strong>，代表了RPC-client组件。</p>
+<p><strong>右边橙色框</strong>，代表了RPC-server。</p>
+<p><strong>蓝色两个小框</strong>，代表了同步RPC-client两个核心组件，序列化组件与连接池组件。</p>
+<p><strong>白色的流程小框</strong>，以及箭头序号1-10，代表整个工作线程的串行执行步骤：</p>
+<p>1）<strong>业务代码发起</strong> <strong>RPC</strong> <strong>调用</strong>，Result&#x3D;Add(Obj1,Obj2)</p>
+<p>2）序列化组件，将对象调用序列化成二进制字节流，可理解为一个待发送的包packet1</p>
+<p>3）通过连接池组件拿到一个可用的连接connection</p>
+<p>4）通过连接connection将包packet1发送给RPC-server</p>
+<p>5）发送包在网络传输，发给RPC-server</p>
+<p>6）响应包在网络传输，发回给RPC-client</p>
+<p>7）通过连接connection从RPC-server收取响应包packet2</p>
+<p>8）通过连接池组件，将conneciont放回连接池</p>
+<p>9）序列化组件，将packet2范序列化为Result对象返回给调用方</p>
+<p>10）<strong>业务代码获取<strong><strong>Result</strong></strong>结果</strong>，工作线程继续往下走</p>
+<p> 
+RPC框架需要支持负载均衡、故障转移、发送超时，这些特性都是通过连接池组件去实现的。</p>
+<h3 id="连接池组件"><a href="#连接池组件" class="headerlink" title="连接池组件"></a><strong>连接池组件</strong></h3><p><img src="/img/wiki-rpc-call/2.jpg">  </p>
+<p>典型连接池组件对外提供的接口为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">int ConnectionPool::init(…);</span><br><span class="line"></span><br><span class="line">Connection ConnectionPool::getConnection();</span><br><span class="line"></span><br><span class="line">intConnectionPool::putConnection(Connection t);</span><br></pre></td></tr></table></figure>
+
+<h4 id="INIT"><a href="#INIT" class="headerlink" title="INIT"></a>INIT</h4><p>和下游RPC-server（一般是一个集群），建立N个tcp长连接，即所谓的连接“池”</p>
+<h4 id="getConnection"><a href="#getConnection" class="headerlink" title="getConnection"></a>getConnection</h4><p>从连接“池”中拿一个连接，加锁（置一个标志位），返回给调用方</p>
+<h4 id="putConnection"><a href="#putConnection" class="headerlink" title="putConnection"></a>putConnection</h4><p>将一个分配出去的连接放回连接“池”中，解锁（也是置一个标志位）</p>
+<h3 id="如何实现负载均衡？"><a href="#如何实现负载均衡？" class="headerlink" title="如何实现负载均衡？"></a><strong>如何实现负载均衡？</strong></h3><p>回答：连接池中建立了与一个RPC-server集群的连接，连接池在返回连接的时候，需要具备随机性。</p>
+<h3 id="如何实现故障转移？"><a href="#如何实现故障转移？" class="headerlink" title="如何实现故障转移？"></a><strong>如何实现故障转移？</strong></h3><p>回答：连接池中建立了与一个RPC-server集群的连接，当连接池发现某一个机器的连接异常后，需要将这个机器的连接排除掉，返回正常的连接，在机器恢复后，再将连接加回来。</p>
+<h3 id="如何实现发送超时？"><a href="#如何实现发送超时？" class="headerlink" title="如何实现发送超时？"></a><strong>如何实现发送超时？</strong></h3><p>回答：因为是同步阻塞调用，拿到一个连接后，使用带超时的send&#x2F;recv即可实现带超时的发送和接收。</p>
+<p> </p>
+<p>总的来说，同步的RPC-client的实现是相对比较容易的，序列化组件、连接池组件配合多工作线程数，就能够实现。还有一个问题，就是【<a target="_blank" rel="noopener" href="http://mp.weixin.qq.com/s?__biz=MjM5ODYxMDA5OQ==&mid=404369373&idx=1&sn=cab2ac9ec0edf92e744a2329662b16cd&scene=21#wechat_redirect">“工作线程数设置多少最为合适？</a>”】，这个问题在之前的文章中讨论过，此处不再深究。</p>
+<h2 id="RPC-client-异步回调"><a href="#RPC-client-异步回调" class="headerlink" title="RPC-client 异步回调"></a><strong>RPC-client</strong> <strong>异步回调</strong></h2><p><img src="/img/wiki-rpc-call/3.jpg"><br>所谓<strong>异步回调</strong>，在得到结果之前，不会处于阻塞状态，理论上任何时间都没有任何线程处于阻塞状态，因此异步回调的模型，理论上只需要很少的工作线程与服务连接就能够达到很高的吞吐量。</p>
+<p>上图中<strong>左边的框框</strong>，是少量工作线程（少数几个就行了）进行调用与回调。</p>
+<p><strong>中间粉色的框框</strong>，代表了RPC-client组件。</p>
+<p><strong>右边橙色框</strong>，代表了RPC-server。</p>
+<p><strong>蓝色六个小框</strong>，代表了异步RPC-client六个核心组件：上下文管理器，超时管理器，序列化组件，下游收发队列，下游收发线程，连接池组件。</p>
+<p><strong>白色的流程小框</strong>，以及箭头序号1-17，代表整个工作线程的串行执行步骤：</p>
+<p>1）<strong>业务代码发起异步<strong><strong>RPC</strong></strong>调用</strong>，Add(Obj1,Obj2, callback)</p>
+<p>2）上下文管理器，将请求，回调，上下文存储起来</p>
+<p>3）序列化组件，将对象调用序列化成二进制字节流，可理解为一个待发送的包packet1</p>
+<p>4）下游收发队列，将报文放入“待发送队列”，此时调用返回，不会阻塞工作线程</p>
+<p>5）下游收发线程，将报文从“待发送队列”中取出，通过连接池组件拿到一个可用的连接connection</p>
+<p>6）通过连接connection将包packet1发送给RPC-server</p>
+<p>7）发送包在网络传输，发给RPC-server</p>
+<p>8）响应包在网络传输，发回给RPC-client</p>
+<p>9）通过连接connection从RPC-server收取响应包packet2</p>
+<p>10）下游收发线程，将报文放入“已接受队列”，通过连接池组件，将conneciont放回连接池</p>
+<p>11）下游收发队列里，报文被取出，此时回调将要开始，不会阻塞工作线程</p>
+<p>12）序列化组件，将packet2范序列化为Result对象</p>
+<p>13）上下文管理器，将结果，回调，上下文取出</p>
+<p>14）<strong>通过</strong> <strong>callback</strong> <strong>回调业务代码，返回Result</strong> <strong>结果</strong>，工作线程继续往下走</p>
+<p> 
+如果请求长时间不返回，处理流程是：</p>
+<p>15）上下文管理器，请求长时间没有返回</p>
+<p>16）超时管理器拿到超时的上下文</p>
+<p>17）<strong>通过</strong> <strong>timeout_cb</strong> <strong>回调业务代码</strong>，工作线程继续往下走</p>
+<p> </p>
+<h3 id="上下文管理器"><a href="#上下文管理器" class="headerlink" title="上下文管理器"></a><strong>上下文管理器</strong></h3><p><strong>为什么需要上下文管理器？</strong></p>
+<p>回答：由于请求包的发送，响应包的回调都是异步的，甚至不在同一个工作线程中完成，需要一个组件来记录一个请求的上下文，把请求-响应-回调等一些信息匹配起来。</p>
+<p> 
+<strong>如何将请求-</strong> <strong>响应-</strong> <strong>回调这些信息匹配起来？</strong></p>
+<p>这是一个很有意思的问题，通过一条连接往下游服务发送了a，b，c三个请求包，异步的收到了x，y，z三个响应包：</p>
+<p><img src="/img/wiki-rpc-call/4.jpg">  </p>
+<p><strong>（1）怎么知道哪个请求包与哪个响应包对应？</strong></p>
+<p><strong>（2）怎么知道哪个响应包与哪个回调函数对应？</strong></p>
+<p>回答：这是通过【请求id】来实现请求-响应-回调的串联的。</p>
+<p><img src="/img/wiki-rpc-call/5.jpg"><br>整个处理流程如上，通过请求id，上下文管理器来对应请求-响应-callback之间的映射关系：</p>
+<p>1）生成请求id</p>
+<p>2）生成请求上下文context，上下文中包含发送时间time，回调函数callback等信息</p>
+<p>3）上下文管理器记录req-id与上下文context的映射关系，</p>
+<p>4）将req-id打在请求包里发给RPC-server</p>
+<p>5）RPC-server将req-id打在响应包里返回</p>
+<p>6）由响应包中的req-id，通过上下文管理器找到原来的上下文context</p>
+<p>7）从上下文context中拿到回调函数callback</p>
+<p>8）callback将Result带回，推动业务的进一步执行</p>
+<p> </p>
+<p><strong>如何实现负载均衡，故障转移？</strong></p>
+<p>回答：与同步的连接池思路相同。不同在于，同步连接池使用阻塞方式收发，需要与一个服务的一个ip建立多条连接，异步收发，一个服务的一个ip只需要建立少量的连接（例如，一条tcp连接）。</p>
+<p> </p>
+<p><strong>如何实现超时发送与接收？</strong></p>
+<p>回答：同步阻塞发送，可以直接使用带超时的send&#x2F;recv来实现，异步非阻塞的nio的网络报文收发，如何实现超时接收呢？（由于连接不会一直等待回包，那如何知晓超时呢？）这时，超时管理器就上场啦。</p>
+<p> </p>
+<h3 id="超时管理器"><a href="#超时管理器" class="headerlink" title="超时管理器"></a><strong>超时管理器</strong></h3><p><img src="/img/wiki-rpc-call/6.jpg"><br>超时管理器，用于实现请求回包超时回调处理。</p>
+<p>每一个请求发送给下游RPC-server，会在上下文管理器中保存req-id与上下文的信息，上下文中保存了请求很多相关信息，例如req-id，回包回调，超时回调，发送时间等。</p>
+<p>超时管理器启动timer对上下文管理器中的context进行扫描，看上下文中请求发送时间是否过长，如果过长，就不再等待回包，直接超时回调，推动业务流程继续往下走，并将上下文删除掉。</p>
+<p>如果超时回调执行后，正常的回包又到达，通过req-id在上下文管理器里找不到上下文，就直接将请求丢弃（因为已经超时处理过了）。</p>
+<p> </p>
+<p>however，异步回调和同步回调相比，除了序列化组件和连接池组件，会多出上下文管理器，超时管理器，下游收发队列，下游收发线程等组件，并且对调用方的调用习惯有影响（同步-&gt;回调）。异步回调能提高系统整体的吞吐量，具体使用哪种方式实现RPC-client，可以结合业务场景来选取（对时延敏感的可以选用同步，对吞吐量敏感的可以选用异步）。</p>
+<article class="message message-immersive is-primary">
+<div class="message-body">
+<i class="fas fa-globe-asia mr-2"></i>本文来自
+<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/nk0F-0zSVg2l6AmCJPAx6g">架构师之路</a>.
+</div>
+</article>
+    </div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/RPC/">RPC</a></div><!--!--><div><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6757924689439593" crossOrigin="anonymous"></script><ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-6757924689439593" data-ad-slot="2352785969"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div></article></div><!--!--><nav class="post-navigation mt-4 level is-mobile"><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/pages/practice-tx-k8s-2/"><span class="level-item">性能提升40%: 腾讯 TKE 用 eBPF绕过 conntrack 优化K8s Service</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--><div style="width:100%"><script src="https://giscus.app/client.js" data-repo="thetechstack/thetechstack.github.io" data-repo-id="R_kgDOG6Ti1Q" data-category="Announcements" data-category-id="DIC_kwDOG6Ti1c4COQtm" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light" data-lang="zh-CN" crossOrigin="anonymous" async></script></div></div><!--!--><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen  order-3 is-sticky"><div class="card widget" id="toc" data-type="toc"><div class="card-content"><div class="menu"><h3 class="menu-label">目录</h3><ul class="menu-list"><li><a class="level is-mobile" href="#RPC-client同步调用"><span class="level-left"><span class="level-item">1</span><span class="level-item">RPC-client同步调用</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#连接池组件"><span class="level-left"><span class="level-item">1.1</span><span class="level-item">连接池组件</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#INIT"><span class="level-left"><span class="level-item">1.1.1</span><span class="level-item">INIT</span></span></a></li><li><a class="level is-mobile" href="#getConnection"><span class="level-left"><span class="level-item">1.1.2</span><span class="level-item">getConnection</span></span></a></li><li><a class="level is-mobile" href="#putConnection"><span class="level-left"><span class="level-item">1.1.3</span><span class="level-item">putConnection</span></span></a></li></ul></li><li><a class="level is-mobile" href="#如何实现负载均衡？"><span class="level-left"><span class="level-item">1.2</span><span class="level-item">如何实现负载均衡？</span></span></a></li><li><a class="level is-mobile" href="#如何实现故障转移？"><span class="level-left"><span class="level-item">1.3</span><span class="level-item">如何实现故障转移？</span></span></a></li><li><a class="level is-mobile" href="#如何实现发送超时？"><span class="level-left"><span class="level-item">1.4</span><span class="level-item">如何实现发送超时？</span></span></a></li></ul></li><li><a class="level is-mobile" href="#RPC-client-异步回调"><span class="level-left"><span class="level-item">2</span><span class="level-item">RPC-client 异步回调</span></span></a><ul class="menu-list"><li><a class="level is-mobile" href="#上下文管理器"><span class="level-left"><span class="level-item">2.1</span><span class="level-item">上下文管理器</span></span></a></li><li><a class="level is-mobile" href="#超时管理器"><span class="level-left"><span class="level-item">2.2</span><span class="level-item">超时管理器</span></span></a></li></ul></li></ul></div></div><style>#toc .menu-list > li > a.is-active + .menu-list { display: block; }#toc .menu-list > li > a + .menu-list { display: none; }</style><script src="/js/toc.js" defer></script></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/CPython/"><span class="tag">CPython</span><span class="tag">5</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Feed%E6%9C%8D%E5%8A%A1/"><span class="tag">Feed服务</span><span class="tag">3</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Knative/"><span class="tag">Knative</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Kubernetes/"><span class="tag">Kubernetes</span><span class="tag">25</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Linux%E7%BD%91%E7%BB%9C/"><span class="tag">Linux网络</span><span class="tag">9</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Python/"><span class="tag">Python</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/RPC/"><span class="tag">RPC</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Serverless/"><span class="tag">Serverless</span><span class="tag">5</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Yarn/"><span class="tag">Yarn</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E4%B8%80%E8%87%B4%E6%80%A7/"><span class="tag">分布式一致性</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%9C%A8%E7%A6%BB%E7%BA%BF%E6%B7%B7%E9%83%A8/"><span class="tag">在离线混部</span><span class="tag">4</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/"><span class="tag">大数据</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%97%B6%E9%97%B4%E5%BA%8F%E5%88%97/"><span class="tag">时间序列</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%99%BA%E8%83%BD%E8%BF%90%E7%BB%B4/"><span class="tag">智能运维</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BC%96%E8%AF%91%E5%8E%9F%E7%90%86/"><span class="tag">编译原理</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E8%99%9A%E6%8B%9F%E5%8C%96/"><span class="tag">网络虚拟化</span><span class="tag">3</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%99%9A%E6%8B%9F%E6%9C%BA/"><span class="tag">虚拟机</span><span class="tag">2</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AF%AD%E8%A8%80%E7%89%B9%E6%80%A7/"><span class="tag">语言特性</span><span class="tag">2</span></a></div></div></div></div></div><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg"></figure><p class="is-size-6 is-block">公众号：面向问题编程</p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives"><p class="title">69</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories"><p class="title">5</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags"><p class="title">18</p></a></div></div></nav></div></div><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/"><span class="level-start"><span class="level-item">一文了解</span></span><span class="level-end"><span class="level-item tag">30</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E5%AE%9E%E8%B7%B5/"><span class="level-start"><span class="level-item">技术实践</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/"><span class="level-start"><span class="level-item">技术架构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BB%BC%E8%BF%B0/"><span class="level-start"><span class="level-item">综述</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E9%97%AE%E9%A2%98/"><span class="level-start"><span class="level-item">问题</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li></ul></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a><p class="is-size-7"><span>&copy; 2022 面向问题编程</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-CN");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/lg-zoom@1.3.0/dist/lg-zoom.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script type="text/x-mathjax-config">MathJax.Hub.Config({
+            'HTML-CSS': {
+                matchFontHeight: false
+            },
+            SVG: {
+                matchFontHeight: false
+            },
+            CommonHTML: {
+                matchFontHeight: false
+            },
+            tex2jax: {
+                inlineMath: [
+                    ['$','$'],
+                    ['\\(','\\)']
+                ]
+            }
+        });</script><script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.9/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script><!--!--><!--!--><!--!--><script src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script src="/js/insight.js" defer></script><script>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script></body></html>
