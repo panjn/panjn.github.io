@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><title>Kubernetes API 与 Operator：不为人知的开发者战争（二） - 面向问题编程</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="面向问题编程"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="面向问题编程"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="前情回顾：《Kubernetes API 与 Operator：不为人知的开发者战争（上） 2016 年秋天，原 CoreOS 公司的工程师邓洪超像往常一样，来到了同事位于福斯特城（Foster City）的公寓进行结对编程。每周四相约在这里结对，是这两位工程师多年来约定俗成的惯例。"><meta property="og:type" content="blog"><meta property="og:title" content="Kubernetes API 与 Operator：不为人知的开发者战争（二）"><meta property="og:url" content="https://www.heapoverflow.cn/pages/k8s-operator-2/"><meta property="og:site_name" content="面向问题编程"><meta property="og:description" content="前情回顾：《Kubernetes API 与 Operator：不为人知的开发者战争（上） 2016 年秋天，原 CoreOS 公司的工程师邓洪超像往常一样，来到了同事位于福斯特城（Foster City）的公寓进行结对编程。每周四相约在这里结对，是这两位工程师多年来约定俗成的惯例。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://www.heapoverflow.cn/img/k8s-operator-2/0.jpg"><meta property="article:published_time" content="2022-04-12T15:13:01.436Z"><meta property="article:modified_time" content="2022-04-12T15:15:56.985Z"><meta property="article:author" content="面向问题编程"><meta property="article:tag" content="Kubernetes"><meta property="twitter:card" content="summary"><meta property="twitter:image" content="/img/k8s-operator-2/0.jpg"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.heapoverflow.cn/pages/k8s-operator-2/"},"headline":"Kubernetes API 与 Operator：不为人知的开发者战争（二）","image":["https://www.heapoverflow.cn/img/k8s-operator-2/0.jpg"],"datePublished":"2022-04-12T15:13:01.436Z","dateModified":"2022-04-12T15:15:56.985Z","author":{"@type":"Person","name":"面向问题编程"},"publisher":{"@type":"Organization","name":"面向问题编程","logo":{"@type":"ImageObject","url":"https://www.heapoverflow.cn/img/logo.svg"}},"description":"前情回顾：《Kubernetes API 与 Operator：不为人知的开发者战争（上） 2016 年秋天，原 CoreOS 公司的工程师邓洪超像往常一样，来到了同事位于福斯特城（Foster City）的公寓进行结对编程。每周四相约在这里结对，是这两位工程师多年来约定俗成的惯例。"}</script><link rel="canonical" href="https://www.heapoverflow.cn/pages/k8s-operator-2/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><script src="https://www.googletagmanager.com/gtag/js?id=G-ETGL163DQH" async></script><script>window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    
+        gtag('config', 'G-ETGL163DQH');</script><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><script data-ad-client="ca-pub-6757924689439593" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+          Array
+              .from(document.querySelectorAll('.tab-content'))
+              .forEach($tab => {
+                  $tab.classList.add('is-hidden');
+              });
+          Array
+              .from(document.querySelectorAll('.tabs li'))
+              .forEach($tab => {
+                  $tab.classList.remove('is-active');
+              });
+          const $activeTab = document.querySelector(location.hash);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+          const $tabMenu = document.querySelector(`a[href="${location.hash}"]`);
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 6.0.0"></head><body class="is-2-column"><nav class="navbar navbar-main"><div class="container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/categories/%E9%97%AE%E9%A2%98/">问题</a><a class="navbar-item" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/">技术架构</a><a class="navbar-item" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></div><div class="navbar-end"><a class="navbar-item" rel="noopener" title="分类" href="/categories">分类</a><a class="navbar-item" rel="noopener" title="标签" href="/tags">标签</a><a class="navbar-item" rel="noopener" title="归档" href="/archives">归档</a><a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;"><i class="fas fa-list-ul"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-9-widescreen"><div class="card"><div class="card-image"><span class="image is-7by3"><img class="fill" src="/img/k8s-operator-2/0.jpg" alt="Kubernetes API 与 Operator：不为人知的开发者战争（二）"></span></div><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-04-12T15:13:01.436Z" title="2022/4/12 下午11:13:01">2022-04-12</time>发表</span><span class="level-item"><time dateTime="2022-04-12T15:15:56.985Z" title="2022/4/12 下午11:15:56">2022-04-12</time>更新</span><span class="level-item">32 分钟读完 (大约4745个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">Kubernetes API 与 Operator：不为人知的开发者战争（二）</h1><div class="content"><p>前情回顾：《<a href="/pages/k8s-operator/">Kubernetes API 与 Operator：不为人知的开发者战争（上）</a></p>
+<p>2016 年秋天，原 CoreOS 公司的工程师邓洪超像往常一样，来到了同事位于福斯特城（Foster City）的公寓进行结对编程。每周四相约在这里结对，是这两位工程师多年来约定俗成的惯例。</p>
+<span id="more"></span>  
+
+<p><img src="/img/k8s-operator-2/1.jpg"></p>
+<p>CoreOS 当年开发 etcd 所在的车库</p>
+<p>不过，与以往不同的是，相比于往常天马行空般的头脑风暴，这一次，这两位工程师的脑子里正在琢磨着的，是一个非常“接地气”的小项目。  </p>
+<p>我们知道，Kubernetes 项目实现“容器编排”的核心，在于一个叫做“控制器模式”的机制，即：通过对 etcd 里的 API 对象的变化进行监视（Watch），Kubernetes 项目就可以在一个叫做 Controller 的组件里对这些变化进行响应。而无论是 Pod 等应用对象，还是 iptables、存储设备等服务对象，任何一个 API 对象发生变化，那么 Kubernetes 接下来需要执行的响应逻辑，就是对应的 Controller 里定义的编排动作。</p>
+<p>所以，一个自然而然的想法就是，作为 Kubernetes 项目的用户，我能不能自己编写一个 Controller 来定义我所期望的编排动作呢？比如：当一个 Pod 对象被更新的时候，我的 Controller 可以在“原地”对 Pod 进行“重启”，而不是像 Deployment 那样必须先删除 Pod，然后再创建 Pod。</p>
+<p>这个想法，其实是很多应用开发者以及 PaaS 用户的强烈需求，也是一直以来萦绕在 CoreOS 公司 CEO Alex Polvi 脑海里的一个念头。而在一次简单的内部讨论提及之后，这个念头很快就激发出了两位工程师的技术灵感，成为了周四结对编程的新主题。</p>
+<p>而这一次，他们决定把这个小项目，起名叫做：Operator。</p>
+<p>所以顾名思义，Operator 这个项目最开始的初衷，是用来帮助开发者实现运维（Operate）能力的。但 Operator 的核心思想，却并不是“替开发者做运维工作”，而是“让开发者自己编写运维工具”。更有意思的是，这个运维工具的编写标准，或者说，编写 Operator 代码可以参考的模板，正是 Kubernetes 的“控制器模式（Controller Pattern）”。</p>
+<p>前面已经说过， Kubernetes 的“控制器模式”，是围绕着比如 Pod 这样的 API 对象，在 Controller 通过响应它的增删改查来定义对 Pod 的编排动作。</p>
+<p>而 Operator 的设计思路，就是允许开发者在 Kubernetes 里添加一个新的 API 对象，用来描述一个分布式应用的集群。然后，在这个 API 对象的 Controller 里，开发者就可以定义对这个分布式应用集群的运维动作了。</p>
+<p>举个例子， 假设下面这个 YAML 文件定义的，是一个 3 节点 etcd 集群的描述：</p>
+<ol>
+<li><p><code>apiVersion:  &quot;etcd.database.coreos.com/v1beta2&quot;</code></p>
+</li>
+<li><p><code>kind:  &quot;EtcdCluster&quot;</code></p>
+</li>
+<li><p><code>metadata:</code></p>
+</li>
+<li><p><code>name:  &quot;example-etcd-cluster&quot;</code></p>
+</li>
+<li><p><code>spec:</code></p>
+</li>
+<li><p><code>size:  3</code></p>
+</li>
+<li><p><code>version:  &quot;3.2.13&quot;</code></p>
+</li>
+</ol>
+<p>有了这样一个 etcdCluster 对象，那么开发者接下来要做的事情，就是编写一个 etcdCluster Controller，使得当任何用户提交这样一个 YAML 文件给 Kubernetes 之后，我们自己编写的 Controller 就会响应 etcdCluster “增加”事件，为用户创建出 3 个节点的 etcd 集群出来。然后，它还会按照我们在 Controller 编写的事件响应逻辑，自动的对这个集群的节点更新、删除等事件做出处理，执行我定义的其他运维功能。像这样一个 etcdCluster Controller，就是 etcd Operator 的核心组成部分了。</p>
+<p>而作为 etcd 的开发者，CoreOS 的两位工程师把对 etcd 集群的运维工作编写成 Go 语言代码，一点都不困难。可是，要完成这个 Operator 真正困难在于：Kubernetes 只认识 Pod、Node、Service 等这些 Kubernetes 自己原生的 API 对象，它怎么可能认识开发者自己定义的这个 etcdCluster 对象呢？</p>
+<p>在当时， Kubernetes 项目允许用户自己添加 API 对象的插件能力，叫做 Third Party Resource，简称：TPR。</p>
+<p>TPR 允许你提交一个 YAML 文件，来定义你想要的的新 API 对象的名字，比如：etcdCluster；也允许你定义这个对象允许的合法的属性，比如：int 格式的 size 字段， string 格式的 version 字段。然后，你就可以提交一个具体的 etcdCluster 对象的描述文件给 Kubernetes，等待该对应的 Controller 进行处理。</p>
+<p>而这个 Controller，就是 Operator 的主干代码了。</p>
+<p>所以接下来，CoreOS 的两位工程师轻车熟路，在 Operator 里对 etcdCluster 对象的增、删、改事件的响应位置，写上了创建、删除、更新 etcd 节点的操作逻辑。然后，调试运行，看着一个 etcd 集群按照 YAML 文件里的描述被创建起来。大功告成！</p>
+<p>就这样，在一个普通的周四下午，世界上第一个 Operator 诞生在了湾区的一所公寓当中。</p>
+<p>而对于 CoreOS 的两位工程师来说，编写这个小工具的主要目的，就是借助 Kubernetes 的核心原理来自动化的管理 etcd 集群，更重要的是，不需要使用 Kubernetes 里自带的 StatefulSet。</p>
+<p>你可能已经知道，Kubernetes 里本身就内置了一个叫做 StatefulSet 的功能，是专门用来管理有状态应用的。而 StatefulSet 的核心原理，其实是对分布式应用的两种状态进行了保持：</p>
+<ul>
+<li><p>分布式应用的拓扑状态，或者说，节点之间的启动顺序；</p>
+</li>
+<li><p>分布式应用的存储状态，或者说，每个节点依赖的持久化数据。</p>
+</li>
+</ul>
+<p>可是，为了能够实现上述两种状态的保持机制，StatefulSet 的设计就给应用开发者带来了额外的束缚。</p>
+<p>比如，etcd 集群各节点之间的拓扑关系，并不依赖于节点名字或者角色（比如 Master 或者 Slave）来确定，而是记录在每个 etcd 节点的启动参数当中。这使得 StatefulSet 通过“为节点分配有序的 DNS 名字”的拓扑保持方式，实际上没有了用武之地，反而还得要求开发者在节点的启动命令里添加大量的逻辑来生成正确的启动命令，非常不优雅。类似的，对于存储状态来说，etcd 集群对数据的备份和恢复方法，也跟 StatefulSet 依赖的的远程持久化数据卷方案并没有太大关系。</p>
+<p>不难看到， StatefulSet 其实比较适用于应用本身节点管理能力不完善的项目，比如 MySQL。而对于 etcd 这种已经借助 Raft 实现了自管理的分布式应用来说， StatefulSet 的使用方法和带来的各种限制，其实是非常别扭的。</p>
+<p>而带着工程师特有的较真儿精神，邓洪超和他的同事借助 Kubernetes 原生的扩展机制实现的，正是一个比 StatefulSet 更加灵活、能够把控制权重新交还给开发者的分布式应用管理工具。他们把这个工具起名叫做 Operator，并在几个月后的 KubeCon 上进行了一次 Demo ，推荐大家尝试使用 Operator 来部署 etcd 集群。</p>
+<p>没有人能想到的是，这个当时还处于 PoC 状态的小项目一经公布，就立刻激发起了整个社区的模仿和学习的热潮。</p>
+<p>很快，大量的应用开发者纷纷涌进 Kubernetes 社区，争先恐后的宣布自己的分布式项目可以通过 Operator 运行起来。而敏锐的公有云提供商们很快看出了这其中的端倪：Operator 这个小框架，已然成为了分布式应用和有状态应用“上云”的必经之路。Prometheus，Rook，伴随着越来越多的、以往在容器里运行起来困难重重的应用，通过 Operator 走上了 Kubernetes 之后，Kubernetes 项目第一次出现在了开发者生态的核心位置。这个局面，已经远远超出了邓洪超甚至 CoreOS 公司自己的预期。</p>
+<p>更重要的是，不同于 StatefulSet 等 Kubernetes 原生的编排概念，Operator 依赖的 Kubernetes 能力，只有最核心的声明式 API 与控制器模式；Operator 具体的实现逻辑，则编写在自定义 Controller 的代码中。这种设计给开发者赋予了极高的自由度，这在整个云计算和 PaaS 领域的发展过程中，都是非常罕见的。</p>
+<p>此外，相比于 Helm、Docker Compose 等描述应用静态关系的编排工具，Operator 定义的乃是应用运行起来后整个集群的动态逻辑。得益于 Kubernetes 项目良好的声明式 API 的设计和开发者友好的 API 编程范式，Operator 在保证上述自由度的同时，又可以始终如一的展现出清晰的架构和设计逻辑，使得应用的开发者们，可以通过复制粘贴就快速搭建出一个 Operator 的框架，然后专注于填写自己的业务逻辑。</p>
+<p>在向来讲究“用脚投票”的开发者生态当中，Operator 这样一个编程友好、架构清晰、方便代码复制粘贴的小工具，本身就已经具备了某些成功的特质。</p>
+<p>然而，Operator 的意外走红，并没有让 CoreOS 公司“一夜成名”，反而差点将这个初出茅庐的项目，扼杀在萌芽状态。</p>
+<p>在当时的 Kubernetes 社区里，跟应用开发者打交道并不是一个非常常见的事情。而 Operator 项目的诞生，却把 Kubernetes 项目第一次拉近到了开发者的面前，这让整个社区感觉了不适应。而作为 Kubernetes 项目 API 治理的负责人，Google 团队对这种冲突的感受最为明显。</p>
+<p>对于 Google 团队来说，Controller 以及控制器模式，应该是一个隐藏在 Kubernetes 内部实现里的核心机制，并不适合直接开放给开发者来使用。退一步说，即使开放出去，这个 Controller 的设计和用法，也应该按照 Kubernetes 现有的 API 层规范来进行，最好能成为 Kubernetes 内置 Controller Manager 管理下的一部分。可是， Operator 却把直接编写 Controller 代码的自由度完全交给了开发者，成为了一个游离于 Kubernetes Controller Manager 之外的外部组件。</p>
+<p>带着这个想法，社区里的很多团队从 Operator 项目诞生一开始，就对它的设计和演进方向提出了质疑，甚至建议将 Operator 的名字修改为 Custom Kubernetes Controller。而无巧不成书，就在 Google 和 CoreOS 在 Controller 的话语权上争执不下的时候， Kubernetes 项目的发起人之一 Brendan Burns 突然宣布加入了微软，这让 Google 团队和 Operator 项目的关系一下子跌倒了冰点。</p>
+<p>你可能会有些困惑：Brendan Burns 与 Kubernetes 的关系我是清楚的，但这跟 Operator 又有什么瓜葛吗？</p>
+<p>实际上，你可能很难想到，Brendan Burns 和他的团队，才是 TPR （Third Party Resource）这个特性最初的发起人。</p>
+<p>所以，几乎在一夜之间，Operator 项目链路上的每一个环节，都与 Google 团队完美的擦肩而过。眼睁睁的看着这个正冉冉升起的开发者工具突然就跟自己完全没了关系，这个中滋味，确实不太好受。</p>
+<p>于是，在 2017年初，Google 团队和 RedHat 公司开始主动在社区推广 UAS（User Aggregated APIServer），也就是后来 APIServer Aggregator 的雏形。APIServer Aggregator 的设计思路是允许用户编写一个自定义的 APIServer，在这里面添加自定义 API。然后，这个 APIServer 就可以跟 Kubernetes 原生的 APIServer 绑定部署在一起统一提供服务了。不难看到，这个设计与 Google 团队认为自定义 API 必须在 Kubernetes 现有框架下进行管理的想法还是比较一致的。</p>
+<p>紧接着，RedHat 和 Google 联盟开始游说社区使用 UAS 机制取代 TPR，并且建议直接从 Kubernetes 项目里废弃 TPR 这个功能。一时间，社区里谣言四起，不少已经通过 TPR 实现的项目，也开始转而使用 UAS 来重构以求自保。 而 Operator 这个严重依赖于 TPR 的小项目，还没来得及发展壮大，就被推向了关闭的边缘。</p>
+<p>面对几乎要与社区背道而驰的困境，CoreOS 公司的 CTO Brandon Philips 做出了一个大胆的决定：让社区里的所有开发者发声，挽救 TPR 和 Operator。</p>
+<p>2017 年 2月，Brandon Philips 在 GitHub 上开了一个帖子（Gist）， 号召所有使用 TPR 或者 Operator 项目的开发者在这里留下的自己的项目链接或者描述。这个帖子，迅速的成为了当年容器技术圈最热门的事件之一，登上了 HackerNews 的头条。有趣的是，这个帖子直到今天也仍然健在，甚至还在被更新，你可以点击这个链接去感受一下当时的盛况。<a target="_blank" rel="noopener" href="https://gist.github.com/philips/a97a143546c87b86b870a82a753db14c">https://gist.github.com/philips/a97a143546c87b86b870a82a753db14c</a></p>
+<p>而伴随着 Kubernetes 项目的迅速崛起，短短一年时间不到，夹缝中求生存的 Operator 项目，开始对公有云市场产生了不可逆转的影响，也逐步改变了开发者们对“云”以及云上应用开发模式的基本认知。甚至就连 Google Cloud 自己最大的客户之一 Snapchat ，也成为了 Operator 项目的忠实用户。在来自社区的巨大压力下，在这个由成千上万开发者们自发维护起来的 Operator 生态面前，Google 和 RedHat 公司最终选择了反省和退让。</p>
+<p>有意思的是，这个退让的结果，再一次为这次闹剧增添了几分戏剧性。</p>
+<p>就在 Brandon Phillips 的开发者搜集帖发布了不到三个月后，RedHat 和 Google 公司的工程师突然在 Kubernetes 社区里宣布：TPR 即将被废弃，取而代之的是一个名叫 CRD，Custom Resource Definition 的东西。</p>
+<p>于是，开发者们开始忧心忡忡的按照文档，将原本使用 TPR 的代码都升级成 CRD。而就在这时，他们却惊奇的发现，这两种机制除了名字之外，好像并没有任何不同。所谓的升级工作，其实就是将代码里的 TPR 字样全局替换成 CRD 而已。</p>
+<p>难道，这只是虚惊一场？</p>
+<p>其实，很少有人注意到，在 TPR 被替换成 CRD 之后，Brendan Burns 和微软团队就再也没有出现在“自定义 API”这个至关重要的领域里了。而 CRD 现在的负责人，都是来自 Google 和 RedHat 的工程师。</p>
+<p>在这次升级事件之后不久，CoreOS 公司在它的官方网站上发布了一篇叫做：TPR Is Dead! Kubernetes 1.7 Turns to CRD 的博客（<a target="_blank" rel="noopener" href="https://coreos.com/blog/custom-resource-kubernetes-v17%EF%BC%89%EF%BC%8C%E6%97%A8%E5%9C%A8%E6%8C%87%E5%AF%BC%E7%94%A8%E6%88%B7%E4%BB%8E">https://coreos.com/blog/custom-resource-kubernetes-v17），旨在指导用户从</a> TRP 升级成 CRD。不过，现在回头再看一眼这篇文章，平淡无奇的讲述背后，你能否感受到当年这场“开发者战争”的蛛丝马迹呢？</p>
+<p>其实，Operator 并不平坦的晋级之路，只是 Kubernetes API 生态风起云涌的冰山一角。几乎在每个星期，甚至每一天，都有太多围绕着 Kubernetes 开发者生态的角逐，在这个无比繁荣的社区背后，以不为人知的方式开始或者谢幕。</p>
+<p>而这一切纷争的根本原因却无比直白。Kubernetes 项目，已经被广泛认可为云计算时代应用开发者们的终端入口。这正是为何，无论是 Google、微软，还是 CoreOS 以及 Heptio，所有这个生态里的大小玩家，都在不遗余力的在 Kubernetes API 层上捍卫着自己的话语权，以期在这个未来云时代的开发者入口上，争取到自己的一席之地。</p>
+<p><img src="/img/k8s-operator-2/2.jpg"></p>
+<p>而在完成了对收 CoreOS 的收购之后，RedHat 终于在这一领域拿到了可以跟 Google 和微软一较高低的关键位置。2018年，RedHat 不失时机的发布了 Operator Framework，希望通过 Operator 周边工具和生态的进一步完善，把 Operator 确立成为分布式应用开发与管理的关键依赖。而伴随着 Operator 越来越多的介入到应用开发和部署流程之后， Kubernetes API 一定会继续向上演进，进一步影响开发者的认知和编程习惯。这，已经成为了云计算生态继续发展下去的必然趋势。</p>
+<p>而作为这个趋势坚定不移的贯彻者，无论是 Istio，还是 Knative，都在用同样的经历告诉我们这样的道理：只有构建在 Kubernetes 这个云时代基础设施事实标准上的开发者工具，才有可能成为下一个开发者领域的 “Operator” 。</p>
+<article class="message message-immersive is-primary">
+<div class="message-body">
+<i class="fas fa-globe-asia mr-2"></i>本文来自
+<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/ODaOiwXMBhRFZjbdu1BFUA">分布式实验室</a>.
+</div>
+</article>
+    </div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/Kubernetes/">Kubernetes</a></div><!--!--><div><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6757924689439593" crossOrigin="anonymous"></script><ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-6757924689439593" data-ad-slot="2352785969"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div></article></div><!--!--><nav class="post-navigation mt-4 level is-mobile"><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/pages/k8s-operator/"><span class="level-item">Kubernetes API 与 Operator：不为人知的开发者战争（一）</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--><div style="width:100%"><script src="https://giscus.app/client.js" data-repo="thetechstack/thetechstack.github.io" data-repo-id="R_kgDOG6Ti1Q" data-category="Announcements" data-category-id="DIC_kwDOG6Ti1c4COQtm" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light" data-lang="zh-CN" crossOrigin="anonymous" async></script></div></div><!--!--><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen  order-3 is-sticky"><!--!--><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/CPython/"><span class="tag">CPython</span><span class="tag">5</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Feed%E6%9C%8D%E5%8A%A1/"><span class="tag">Feed服务</span><span class="tag">3</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Knative/"><span class="tag">Knative</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Kubernetes/"><span class="tag">Kubernetes</span><span class="tag">27</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Linux%E7%BD%91%E7%BB%9C/"><span class="tag">Linux网络</span><span class="tag">10</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Python/"><span class="tag">Python</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/RPC/"><span class="tag">RPC</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Serverless/"><span class="tag">Serverless</span><span class="tag">5</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Yarn/"><span class="tag">Yarn</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E4%B8%80%E8%87%B4%E6%80%A7/"><span class="tag">分布式一致性</span><span class="tag">2</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%9C%A8%E7%A6%BB%E7%BA%BF%E6%B7%B7%E9%83%A8/"><span class="tag">在离线混部</span><span class="tag">4</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/"><span class="tag">大数据</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%97%B6%E9%97%B4%E5%BA%8F%E5%88%97/"><span class="tag">时间序列</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%99%BA%E8%83%BD%E8%BF%90%E7%BB%B4/"><span class="tag">智能运维</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BC%93%E5%AD%98/"><span class="tag">缓存</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BC%96%E8%AF%91%E5%8E%9F%E7%90%86/"><span class="tag">编译原理</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E8%99%9A%E6%8B%9F%E5%8C%96/"><span class="tag">网络虚拟化</span><span class="tag">3</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%99%9A%E6%8B%9F%E6%9C%BA/"><span class="tag">虚拟机</span><span class="tag">2</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AF%AD%E8%A8%80%E7%89%B9%E6%80%A7/"><span class="tag">语言特性</span><span class="tag">2</span></a></div></div></div></div></div><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg"></figure><p class="is-size-6 is-block">公众号：面向问题编程</p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives"><p class="title">74</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories"><p class="title">5</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags"><p class="title">19</p></a></div></div></nav></div></div><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/"><span class="level-start"><span class="level-item">一文了解</span></span><span class="level-end"><span class="level-item tag">33</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E5%AE%9E%E8%B7%B5/"><span class="level-start"><span class="level-item">技术实践</span></span><span class="level-end"><span class="level-item tag">10</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/"><span class="level-start"><span class="level-item">技术架构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BB%BC%E8%BF%B0/"><span class="level-start"><span class="level-item">综述</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E9%97%AE%E9%A2%98/"><span class="level-start"><span class="level-item">问题</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li></ul></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a><p class="is-size-7"><span>&copy; 2022 面向问题编程</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-CN");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/lg-zoom@1.3.0/dist/lg-zoom.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script type="text/x-mathjax-config">MathJax.Hub.Config({
+            'HTML-CSS': {
+                matchFontHeight: false
+            },
+            SVG: {
+                matchFontHeight: false
+            },
+            CommonHTML: {
+                matchFontHeight: false
+            },
+            tex2jax: {
+                inlineMath: [
+                    ['$','$'],
+                    ['\\(','\\)']
+                ]
+            }
+        });</script><script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.9/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script><!--!--><!--!--><!--!--><script src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script src="/js/insight.js" defer></script><script>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script></body></html>
