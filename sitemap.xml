@@ -2,6 +2,15 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <url>
+    <loc>https://www.heapoverflow.cn/pages/youdao-k8s-1/</loc>
+    
+    <lastmod>2022-04-14</lastmod>
+    
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <url>
     <loc>https://www.heapoverflow.cn/pages/k8s-operator/</loc>
     
     <lastmod>2022-04-12</lastmod>
@@ -686,13 +695,6 @@
 
   
   <url>
-    <loc>https://www.heapoverflow.cn/tags/%E6%97%B6%E9%97%B4%E5%BA%8F%E5%88%97/</loc>
-    <lastmod>2022-04-14</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.2</priority>
-  </url>
-  
-  <url>
     <loc>https://www.heapoverflow.cn/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/</loc>
     <lastmod>2022-04-14</lastmod>
     <changefreq>weekly</changefreq>
@@ -721,14 +723,14 @@
   </url>
   
   <url>
-    <loc>https://www.heapoverflow.cn/tags/Kubernetes/</loc>
+    <loc>https://www.heapoverflow.cn/tags/%E5%9C%A8%E7%A6%BB%E7%BA%BF%E6%B7%B7%E9%83%A8/</loc>
     <lastmod>2022-04-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.2</priority>
   </url>
   
   <url>
-    <loc>https://www.heapoverflow.cn/tags/%E5%9C%A8%E7%A6%BB%E7%BA%BF%E6%B7%B7%E9%83%A8/</loc>
+    <loc>https://www.heapoverflow.cn/tags/Kubernetes/</loc>
     <lastmod>2022-04-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.2</priority>
@@ -743,6 +745,13 @@
   
   <url>
     <loc>https://www.heapoverflow.cn/tags/%E8%99%9A%E6%8B%9F%E6%9C%BA/</loc>
+    <lastmod>2022-04-14</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.2</priority>
+  </url>
+  
+  <url>
+    <loc>https://www.heapoverflow.cn/tags/%E6%97%B6%E9%97%B4%E5%BA%8F%E5%88%97/</loc>
     <lastmod>2022-04-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.2</priority>

@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"><meta><title>有道Kubernetes容器API监控系统设计和实践 - 面向问题编程</title><link rel="manifest" href="/manifest.json"><meta name="application-name" content="面向问题编程"><meta name="msapplication-TileImage" content="/img/favicon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="面向问题编程"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="description" content="本篇文章，将给大家分享有道容器服务API监控方案，这个方案同时具有轻量级和灵活性的特点，很好地体现了Kubernetes集群化管理的优势，解决了静态配置的监控不满足容器服务监控的需求。并做了易用性和误报消减、可视化面板等一系列优化，目前已经超过80%的容器服务已经接入了该监控系统。"><meta property="og:type" content="blog"><meta property="og:title" content="有道Kubernetes容器API监控系统设计和实践"><meta property="og:url" content="https://www.heapoverflow.cn/pages/youdao-k8s-1/"><meta property="og:site_name" content="面向问题编程"><meta property="og:description" content="本篇文章，将给大家分享有道容器服务API监控方案，这个方案同时具有轻量级和灵活性的特点，很好地体现了Kubernetes集群化管理的优势，解决了静态配置的监控不满足容器服务监控的需求。并做了易用性和误报消减、可视化面板等一系列优化，目前已经超过80%的容器服务已经接入了该监控系统。"><meta property="og:locale" content="zh_CN"><meta property="og:image" content="https://www.heapoverflow.cn/img/youdao-k8s-1/1.jpg"><meta property="article:published_time" content="2022-04-14T14:34:11.103Z"><meta property="article:modified_time" content="2022-04-14T14:38:03.600Z"><meta property="article:author" content="面向问题编程"><meta property="article:tag" content="Kubernetes"><meta property="twitter:card" content="summary"><meta property="twitter:image" content="/img/youdao-k8s-1/1.jpg"><script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.heapoverflow.cn/pages/youdao-k8s-1/"},"headline":"有道Kubernetes容器API监控系统设计和实践","image":["https://www.heapoverflow.cn/img/youdao-k8s-1/1.jpg"],"datePublished":"2022-04-14T14:34:11.103Z","dateModified":"2022-04-14T14:38:03.600Z","author":{"@type":"Person","name":"面向问题编程"},"publisher":{"@type":"Organization","name":"面向问题编程","logo":{"@type":"ImageObject","url":"https://www.heapoverflow.cn/img/logo.svg"}},"description":"本篇文章，将给大家分享有道容器服务API监控方案，这个方案同时具有轻量级和灵活性的特点，很好地体现了Kubernetes集群化管理的优势，解决了静态配置的监控不满足容器服务监控的需求。并做了易用性和误报消减、可视化面板等一系列优化，目前已经超过80%的容器服务已经接入了该监控系统。"}</script><link rel="canonical" href="https://www.heapoverflow.cn/pages/youdao-k8s-1/"><link rel="icon" href="/img/favicon.svg"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@9.12.0/styles/atom-one-light.css"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;600&amp;family=Source+Code+Pro"><link rel="stylesheet" href="/css/default.css"><style>body>.footer,body>.navbar,body>.section{opacity:0}</style><!--!--><!--!--><!--!--><!--!--><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/css/lightgallery.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/css/justifiedGallery.min.css"><script src="https://www.googletagmanager.com/gtag/js?id=G-ETGL163DQH" async></script><script>window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    
+        gtag('config', 'G-ETGL163DQH');</script><!--!--><!--!--><style>.pace{-webkit-pointer-events:none;pointer-events:none;-webkit-user-select:none;-moz-user-select:none;user-select:none}.pace-inactive{display:none}.pace .pace-progress{background:#3273dc;position:fixed;z-index:2000;top:0;right:100%;width:100%;height:2px}</style><script src="https://cdn.jsdelivr.net/npm/pace-js@1.2.4/pace.min.js"></script><!--!--><!--!--><script data-ad-client="ca-pub-6757924689439593" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" async></script><!-- hexo injector head_end start --><script>
+  (function () {
+      function switchTab() {
+          if (!location.hash) {
+            return;
+          }
+          Array
+              .from(document.querySelectorAll('.tab-content'))
+              .forEach($tab => {
+                  $tab.classList.add('is-hidden');
+              });
+          Array
+              .from(document.querySelectorAll('.tabs li'))
+              .forEach($tab => {
+                  $tab.classList.remove('is-active');
+              });
+          const $activeTab = document.querySelector(location.hash);
+          if ($activeTab) {
+              $activeTab.classList.remove('is-hidden');
+          }
+          const $tabMenu = document.querySelector(`a[href="${location.hash}"]`);
+          if ($tabMenu) {
+              $tabMenu.parentElement.classList.add('is-active');
+          }
+      }
+      switchTab();
+      window.addEventListener('hashchange', switchTab, false);
+  })();
+  </script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 6.0.0"></head><body class="is-2-column"><nav class="navbar navbar-main"><div class="container"><div class="navbar-brand justify-content-center"><a class="navbar-item navbar-logo" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a></div><div class="navbar-menu"><div class="navbar-start"><a class="navbar-item" href="/">首页</a><a class="navbar-item" href="/categories/%E9%97%AE%E9%A2%98/">问题</a><a class="navbar-item" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/">技术架构</a><a class="navbar-item" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/">一文了解</a></div><div class="navbar-end"><a class="navbar-item" rel="noopener" title="分类" href="/categories">分类</a><a class="navbar-item" rel="noopener" title="标签" href="/tags">标签</a><a class="navbar-item" rel="noopener" title="归档" href="/archives">归档</a><a class="navbar-item is-hidden-tablet catalogue" title="目录" href="javascript:;"><i class="fas fa-list-ul"></i></a><a class="navbar-item search" title="搜索" href="javascript:;"><i class="fas fa-search"></i></a></div></div></div></nav><section class="section"><div class="container"><div class="columns"><div class="column order-2 column-main is-8-tablet is-8-desktop is-9-widescreen"><div class="card"><div class="card-image"><span class="image is-7by3"><img class="fill" src="/img/youdao-k8s-1/1.jpg" alt="有道Kubernetes容器API监控系统设计和实践"></span></div><article class="card-content article" role="article"><div class="article-meta is-size-7 is-uppercase level is-mobile"><div class="level-left"><span class="level-item"><time dateTime="2022-04-14T14:34:11.103Z" title="2022/4/14 下午10:34:11">2022-04-14</time>发表</span><span class="level-item"><time dateTime="2022-04-14T14:38:03.600Z" title="2022/4/14 下午10:38:03">2022-04-14</time>更新</span><span class="level-item"><a class="link-muted" href="/categories/%E6%8A%80%E6%9C%AF%E5%AE%9E%E8%B7%B5/">技术实践</a></span><span class="level-item">27 分钟读完 (大约4071个字)</span></div></div><h1 class="title is-3 is-size-4-mobile">有道Kubernetes容器API监控系统设计和实践</h1><div class="content"><p>本篇文章，将给大家分享有道容器服务API监控方案，这个方案同时具有轻量级和灵活性的特点，很好地体现了Kubernetes集群化管理的优势，解决了静态配置的监控不满足容器服务监控的需求。并做了易用性和误报消减、可视化面板等一系列优化，目前已经超过80%的容器服务已经接入了该监控系统。</p>
+<span id="more"></span>
+
+<h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a><strong>背景</strong></h2><p>Kubernetes 已经成为事实上的编排平台的领导者、下一代分布式架构的代表，其在自动化部署、监控、扩展性、以及管理容器化的应用中已经体现出独特的优势。</p>
+<p>在Kubernetes容器相关的监控上， 我们主要做了几块工作，分别是基于Prometheus的Node、Pod、Kubernetes资源对象监控，容器服务API监控以及基于Grafana的业务流量等指标监控。</p>
+<p>在物理机时代，我们做了分级的接口功能监控——域名级别接口监控和机器级别监控，以便在某个机器出现问题时，我们就能快速发现问题。</p>
+<p><img src="/img/youdao-k8s-1/1.jpg"></p>
+<p>上图中，左边是物理机时代对应的功能监控，包括域名级别接口监控和3台物理机器监控。右边是对应的Kubernetes环境，一个Service的流量会由Kubernetes负载均衡到pod1，pod2，pod3中，我们分别需要添加的是Service和各个Pod的监控。</p>
+<p>由于Kubernetes中的一切资源都是动态的，随着服务版本升级，生成的都是全新的Pod，并且Pod的IP和原来是不一样的。</p>
+<p>综上所述，传统的物理机API不能满足容器服务的监控需求，并且物理机功能监控需要手动运维管理，为此我们期望设计一套适配容器的接口功能监控系统，并且能够高度自动化管理监控信息，实现Pod API自动监控。</p>
+<h2 id="技术选型"><a href="#技术选型" class="headerlink" title="技术选型"></a><strong>技术选型</strong></h2><p>为了满足以上需求，我们初期考虑了以下几个方案。</p>
+<ol>
+<li><p>手动维护各个Service和Pod监控到目前物理机使用的PodMonitor开源监控系统。  </p>
+</li>
+<li><p>重新制定一个包含Kubernetes目录树结构的系统，在这个系统里面看到的所有信息都是最新的， 在这个系统里面，可以做我们的目录树中指定服务的发布、功能监控、测试演练等。  </p>
+</li>
+<li><p>沿用PodMonitor框架，支持动态获取Kubernetes集群中最新的服务和Pod信息，并更新到监控系统中。</p>
+</li>
+</ol>
+<p><strong>方案分析</strong>  </p>
+<p>针对方案一，考虑我们服务上线的频率比较高，并且Kubernetes设计思想便是可随时自动用新生成的Pod（环境）顶替原来不好用的Pod，手动维护Pod监控效率太低，该方案不可行。</p>
+<p>第二个方案应该是比较系统的解决办法，但需要的工作量会比较大，这种思路基本全自己开发，不能很好的利用已有的功能监控系统，迁移成本大。</p>
+<p>于是我们选择了方案三，既能兼容我们物理机的接口功能监控方案，又能动态生成和维护Pod监控。</p>
+<h2 id="整体设计思路"><a href="#整体设计思路" class="headerlink" title="整体设计思路"></a><strong>整体设计思路</strong></h2><p>Kubernetes监控包括以下几个部分：</p>
+<p><img src="/img/youdao-k8s-1/2.jpg"></p>
+<p>Kubernetes容器监控整体构成</p>
+<p>其中API功能监控，是我们保证业务功能正确性的重要监控手段。</p>
+<p>通常业务监控系统都会包含监控配置、数据存储、信息展示、告警这几个模块，我们的API功能监控系统也不例外。</p>
+<p>我们沿用API Monitor框架功能，并结合了容器服务功能监控特点，和已有的告警体系，形成了我们容器API功能监控系统结构：</p>
+<p><img src="/img/youdao-k8s-1/3.jpg"></p>
+<p>API监控系统模块组成</p>
+<p>首先介绍下目前我们物理机使用的API Monitor监控：</p>
+<p>一个开源的框架：<a target="_blank" rel="noopener" href="https://gitee.com/ecar/_team/apimonitor">https://gitee.com/ecar\_team/apimonitor</a></p>
+<p>可以模拟探测http接口、http页面，通过请求耗时和响应结果来判断系统接口的可用性和正确性。支持单个API和多个API调用链的探测。</p>
+<p>如下图所示，第一行监控里面监控的是图片翻译服务域名的地址，后边的是各台物理机的IP：端口。</p>
+<p><img src="/img/youdao-k8s-1/4.jpg"></p>
+<p>点开每条监控</p>
+<p><img src="/img/youdao-k8s-1/5.jpg"></p>
+<p>我们沿用API Monitor框架的大部分功能，其中主要的适配和优化包括：</p>
+<ul>
+<li><p>监控配置和存储部分：一是制定容器服务Service级别监控命名规则：集群.项目.命名空间.服务；（和Kubernetes集群目录树保持一致，方便根据Service生成Pod监控），二是根据Service监控和Kubernetes集群信息动态生成Pod级别监控， 这是实现这套容器功能监控的关键部分。</p>
+</li>
+<li><p>监控执行调度器部分不用改动。</p>
+</li>
+<li><p>信息展示部分，增加了趋势图和错误汇总图表。</p>
+</li>
+<li><p>告警部分，和其它告警使用统一告警组。</p>
+</li>
+</ul>
+<h2 id="具体实践操作"><a href="#具体实践操作" class="headerlink" title="具体实践操作"></a><strong>具体实践操作</strong></h2><p><strong>添加Service级别API监控告警</strong></p>
+<p>需要为待监控服务，配置一个固定的容Service级别监控。</p>
+<p>Service级别监控命名规则：集群.项目.命名空间.服务</p>
+<p>以词典查词服务为例，我们配置一条Service级别的多API监控（也可以是单API监控）</p>
+<ul>
+<li><p>单API：一个服务只需要加一条case用</p>
+</li>
+<li><p>多API：如果一个服务需要加多条功能case</p>
+</li>
+</ul>
+<p><img src="/img/youdao-k8s-1/6.jpg"></p>
+<p>其中“所属系统”是服务所属的告警组，支持电话、短信、popo群、邮件等告警方式（和其它监控告警通用）。</p>
+<p>任务名称：取名规则，Rancher中Kubernetes集群名字.项目名字.命名空间名字.Service名字（一共四段）</p>
+<p>告警消息的字段含义：</p>
+<ul>
+<li><p>docker-dict：告警组，订阅后会收到告警消息</p>
+</li>
+<li><p>k8s-prod-th：集群</p>
+</li>
+<li><p>dict：项目</p>
+</li>
+<li><p>dict：命名空间</p>
+</li>
+<li><p>data-server：workload名字</p>
+</li>
+<li><p>data-server-5b7d996f94-sfjwn：Pod名字</p>
+</li>
+<li><p>{} ：接口返回内容，即：response.content</p>
+</li>
+<li><p><a target="_blank" rel="noopener" href="http://dockermonitor.xxx.youdao.com/monitorLog/?guid=61bbe71eadf849558344ad57d843409c%5C&amp;name=k8s-prod-th.dict.dict.data-server.data-server-5b7d996f94-sfjwn%EF%BC%9A%E5%91%8A%E8%AD%A6%E8%AF%A6%E7%BB%86%E9%93%BE%E6%8E%A5">http://dockermonitor.xxx.youdao.com/monitorLog\?guid=61bbe71eadf849558344ad57d843409c\&amp;name=k8s-prod-th.dict.dict.data-server.data-server-5b7d996f94-sfjwn：告警详细链接</a></p>
+</li>
+</ul>
+<p><strong>自动生成Pod API监控</strong></p>
+<p>自动生成下面三行监控任务：（第一行监控是按上面方法配置的容器Service IP监控，后边三行是自动生成Pod监控任务 ）</p>
+<p><img src="/img/youdao-k8s-1/7.jpg"></p>
+<p>监控Service级别是单API，则自动生成的是单API，Service级别是多API，则自动生成的是多API监控。</p>
+<p>自动生成的Pod级别监控，除了最后两行标红处（ip: port）和Service级别不一样，其他都一样。</p>
+<p><img src="/img/youdao-k8s-1/8.jpg"></p>
+<p>实现Pod自动生成的方法：</p>
+<ol>
+<li><p>给PodMonitor（改框架是java语言编写的），增加一个Java模块，用来同步Kubernetes信息到PodMonitor中。考虑到修改PodMonitor中数据这个行为，本身是可以独立于框架的，可以不修改框架任何一行代码就能实现数据动态更新。</p>
+</li>
+<li><p>对比PodMonitor数据库和Kubernetes集群中的信息，不一致的数据，通过增删改查db，增加Pod的监控。由于数据之间存在关联性，有些任务添加完没有例行运行，故采用了方法三。</p>
+</li>
+<li><p>对比PodMonitor数据库和Kubernetes集群中的信息，不一致的数据，通过调用PodMonitor内部接口添加&#x2F;删除一项监控，然后调接口enable &#x2F;disable job等。</p>
+</li>
+</ol>
+<p>按照可操作性难易， 我们选择了方法三。针对于Kubernetes集群中查到的一条Pod信息：总共有三种情况：</p>
+<ol>
+<li><p>对于表中存在要插入Pod的监控信息记录，并且enable状态为1。则认为该Pod的监控不需要改变</p>
+</li>
+<li><p>对于表中存在要插入Pod的监控信息记录（删除操作并不会删除源数据信息），并且enable状态为0。则认为该Pod的监控已被删除或者被停止。调用删除操作， 清空QRTZ （例行任务插件）表中的响应内容， 调用delete db操作清出监控信息相关表中的内容（使得监控记录不至于一直在增长）</p>
+</li>
+<li><p>对于表中不存在Pod相关信息记录， 则需要新增加的一个Pod。调用post创建监控任务接口（根据Service监控配置）， 并调用get请求设置接口为监控enabled状态。</p>
+</li>
+</ol>
+<p>另外对于已经在物理机PodMonitor中添加了监控的服务，提供了一个小脚本，用于导出物理机PodMonitor域名级别监控到Docker Monitor监控中。</p>
+<h2 id="难点和重点问题解决"><a href="#难点和重点问题解决" class="headerlink" title="难点和重点问题解决"></a><strong>难点和重点问题解决</strong></h2><p><strong>误报消减</strong></p>
+<p>1、上线告警抑制</p>
+<p>由于服务重启期间，会有removing状态和未ready状态的Pod，在dockermonitor系统中存在记录，会引起误报。</p>
+<p>我们的解决方法是提供一个通用脚本，根据Kubernetes服务的存活检查时间，计算容器服务的发布更新时间，确定再自动开启服务监控的时机。实现在服务重启时间段，停止该服务的接口功能告警；存活检查时间过了之后，自动开启监控。</p>
+<p>如下如所示，即Health Check中的Liveness Check检查时间。</p>
+<p><img src="/img/youdao-k8s-1/9.jpg"></p>
+<p>在我们上线发布平台上衔接了该告警抑制功能。</p>
+<p>2、弹性扩缩容告警抑制</p>
+<p>原来我们通过查询Rancher的API接口得到集群中全量信息，在我们服务越来越多之后， 查询一次全量信息需要的时间越来越长，基本需要5min左右。在这个过程中，存在docker-monitor和Kubernetes集群中的信息不一致的情况。</p>
+<p>一开始试图通过按照业务分组，并行调用Rancher接口得到业务Kubernetes集群信息。时间从5min缩短到1min多钟。误报有一定的减少，但从高峰期到低谷期时间段，仍然会有若干Pod在Kubernetes集群中缩掉了，但docker-monitor中仍有相应的告警。</p>
+<p>在调研了一些方案之后，我们通过Kubernetes增量事件（如Pod增加、删除）的机制，拿到集群中最新的信息，Pod的任何变更，3s钟之内就能拿到。</p>
+<p>通过ES的查询接口，使用filebeat-system索引的日志，把Pod带有关键字Releasing address using workloadID（更及时），或kube-system索引的日志: Deleted pod: xx delete 。</p>
+<p>通过这个方案，已经基本没有误报。</p>
+<p><strong>策略优化</strong></p>
+<ul>
+<li><p>为了适配一些API允许一定的容错率，我们在API Monitor框架中增加了重试策略（单API和多API方式均增加该功能）</p>
+</li>
+<li><p>为了适配各类不同业务，允许设置自定义超时时间</p>
+</li>
+</ul>
+<p><img src="/img/youdao-k8s-1/10.jpg"></p>
+<p><strong>易用性</strong></p>
+<ul>
+<li><p>增加复制等功能，打开一个已有的告警配置，修改后点击复制， 则可创建一个新的告警项</p>
+</li>
+<li><p>使用场景: 在多套环境（预发、灰度和全量）监控，以及从一个相似API接口微调得到新API监控</p>
+</li>
+</ul>
+<p><img src="/img/youdao-k8s-1/11.jpg"></p>
+<p><strong>业务适配</strong></p>
+<p>精品课对服务的容器化部署中使用了接口映射机制，使用自定义的监听端口来映射源端口，将Service的监听端口作为服务的入口port供外部访问，如下图所示。当Service的监听端口收到请求时，会将请求报文分发到Pod的源端口，因此对Pod级别的监控，需要找到Pod的源端口。</p>
+<p><img src="/img/youdao-k8s-1/12.jpg"></p>
+<p>我们分析了Rancher提供的服务API文件后发现，在端口的配置信息中，port.containerPort为服务的监听端口，port.sourcePort为pod的监听端口，port.name包含port.containerPo-rt和port.sourcePort的信息，由此找到了Pod的源端口与Service监听端口的关键联系，从而实现了对精品课服务接入本平台的支持。</p>
+<p><img src="/img/youdao-k8s-1/13.jpg"></p>
+<h2 id="上线效果"><a href="#上线效果" class="headerlink" title="上线效果"></a><strong>上线效果</strong></h2><p>容器服务API监控统一，形成一定的规范，帮助快速发现和定位问题。</p>
+<p>通过该容器API监控系统，拦截的典型线上问题有：</p>
+<ul>
+<li><p>xx上线误操作</p>
+</li>
+<li><p>依赖服务xxxlib版本库问题</p>
+</li>
+<li><p>DNS Server解析问题</p>
+</li>
+<li><p>xxx服务OOM问题</p>
+</li>
+<li><p>xxx服务堆内存分配不足问题</p>
+</li>
+<li><p>xx线上压测问题</p>
+</li>
+<li><p>多个业务服务日志写满磁盘问题</p>
+</li>
+<li><p>各类功能不可用问题</p>
+</li>
+<li><p>……</p>
+</li>
+</ul>
+<p>同时增加了API延时趋势图标方便评估服务性能：</p>
+<p><img src="/img/youdao-k8s-1/14.jpg"></p>
+<p>错误统计表方便排查问题：</p>
+<p><img src="/img/youdao-k8s-1/15.jpg"></p>
+<p>结合我们Kubernetes资源对象监控，和Grafana的业务流量等指标监控，线上故障率显著减少，几个业务的容器服务0故障。</p>
+<h2 id="总结与展望"><a href="#总结与展望" class="headerlink" title="总结与展望"></a><strong>总结与展望</strong></h2><p><strong>总结</strong></p>
+<p>在本篇文章中我们介绍了基于静态API监控和Kubernetes集群化管理方案，设计了实时的自动容器API监控系统。</p>
+<p>通过上述方案，我们能够在业务迁移容器后，很快地从物理机监控迁移到容器监控。统一的监控系统，使得我们线上服务问题暴露更及时、故障率也明显减少。</p>
+<p><strong>展望</strong></p>
+<ul>
+<li><p>自动同步Kubernetes服务健康检查到docker-monitor系统，保证每一个服务都有监控。</p>
+</li>
+<li><p>集成到容器监控大盘中，可以利用大盘中Kubernetes资源目录树，更快查找指定服务，以及关联服务的Grafana指标等监控。</p>
+</li>
+<li><p>自动恢复服务，比如在上线指定时间内，发生API监控告警，则自动回滚到上一版本，我们希望监控不仅能发现问题，还能解决问题。</p>
+</li>
+</ul>
+<p>监只是手段，控才是目标。</p>
+<h2 id="结语"><a href="#结语" class="headerlink" title="结语"></a><strong>结语</strong></h2><p>Docker技术将部署过程代码化和持续集成，能保持跨环境的一致性，在应用开发运维的世界中具有极大的吸引力。</p>
+<p>而Kubernetes做了Docker的集群化管理技术，它从诞生时就自带的平台属性，以及良好的架构设计，使得基于Kubernetes容器可以构建起一整套可以解决上述问题的“云原生”技术体系，也降低了我们做持续集成测试、发布、监控、故障演练等统一规划和平台的难度。目前有道业务服务基本都上线到容器，后续我们将陆续迁移基础服务，实现整体的容器化。</p>
+<p>我们也会不断积极拥抱开源，借鉴业界成功案例，寻找适合我们当前业务发展需要的理想选型。</p>
+<article class="message message-immersive is-primary">
+<div class="message-body">
+<i class="fas fa-globe-asia mr-2"></i>本文来自
+<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/wHhgoywbUIoF9AlHu3nO0g">有道技术团队</a>.
+</div>
+</article>
+    </div><div class="article-tags is-size-7 mb-4"><span class="mr-2">#</span><a class="link-muted mr-2" rel="tag" href="/tags/Kubernetes/">Kubernetes</a></div><!--!--><div><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6757924689439593" crossOrigin="anonymous"></script><ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-6757924689439593" data-ad-slot="2352785969"></ins><script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div></article></div><!--!--><nav class="post-navigation mt-4 level is-mobile"><div class="level-end"><a class="article-nav-next level level-item link-muted" href="/pages/k8s-operator-2/"><span class="level-item">Kubernetes API 与 Operator：不为人知的开发者战争（二）</span><i class="level-item fas fa-chevron-right"></i></a></div></nav><!--!--><div style="width:100%"><script src="https://giscus.app/client.js" data-repo="thetechstack/thetechstack.github.io" data-repo-id="R_kgDOG6Ti1Q" data-category="Announcements" data-category-id="DIC_kwDOG6Ti1c4COQtm" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="light" data-lang="zh-CN" crossOrigin="anonymous" async></script></div></div><!--!--><div class="column column-right is-4-tablet is-4-desktop is-3-widescreen  order-3 is-sticky"><div class="card widget" id="toc" data-type="toc"><div class="card-content"><div class="menu"><h3 class="menu-label">目录</h3><ul class="menu-list"><li><a class="level is-mobile" href="#背景"><span class="level-left"><span class="level-item">1</span><span class="level-item">背景</span></span></a></li><li><a class="level is-mobile" href="#技术选型"><span class="level-left"><span class="level-item">2</span><span class="level-item">技术选型</span></span></a></li><li><a class="level is-mobile" href="#整体设计思路"><span class="level-left"><span class="level-item">3</span><span class="level-item">整体设计思路</span></span></a></li><li><a class="level is-mobile" href="#具体实践操作"><span class="level-left"><span class="level-item">4</span><span class="level-item">具体实践操作</span></span></a></li><li><a class="level is-mobile" href="#难点和重点问题解决"><span class="level-left"><span class="level-item">5</span><span class="level-item">难点和重点问题解决</span></span></a></li><li><a class="level is-mobile" href="#上线效果"><span class="level-left"><span class="level-item">6</span><span class="level-item">上线效果</span></span></a></li><li><a class="level is-mobile" href="#总结与展望"><span class="level-left"><span class="level-item">7</span><span class="level-item">总结与展望</span></span></a></li><li><a class="level is-mobile" href="#结语"><span class="level-left"><span class="level-item">8</span><span class="level-item">结语</span></span></a></li></ul></div></div><style>#toc .menu-list > li > a.is-active + .menu-list { display: block; }#toc .menu-list > li > a + .menu-list { display: none; }</style><script src="/js/toc.js" defer></script></div><div class="card widget" data-type="tags"><div class="card-content"><div class="menu"><h3 class="menu-label">标签</h3><div class="field is-grouped is-grouped-multiline"><div class="control"><a class="tags has-addons" href="/tags/CPython/"><span class="tag">CPython</span><span class="tag">5</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Feed%E6%9C%8D%E5%8A%A1/"><span class="tag">Feed服务</span><span class="tag">3</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Knative/"><span class="tag">Knative</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Kubernetes/"><span class="tag">Kubernetes</span><span class="tag">28</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Linux%E7%BD%91%E7%BB%9C/"><span class="tag">Linux网络</span><span class="tag">10</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Python/"><span class="tag">Python</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/RPC/"><span class="tag">RPC</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Serverless/"><span class="tag">Serverless</span><span class="tag">5</span></a></div><div class="control"><a class="tags has-addons" href="/tags/Yarn/"><span class="tag">Yarn</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E4%B8%80%E8%87%B4%E6%80%A7/"><span class="tag">分布式一致性</span><span class="tag">2</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%9C%A8%E7%A6%BB%E7%BA%BF%E6%B7%B7%E9%83%A8/"><span class="tag">在离线混部</span><span class="tag">4</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E5%A4%A7%E6%95%B0%E6%8D%AE/"><span class="tag">大数据</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%97%B6%E9%97%B4%E5%BA%8F%E5%88%97/"><span class="tag">时间序列</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E6%99%BA%E8%83%BD%E8%BF%90%E7%BB%B4/"><span class="tag">智能运维</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BC%93%E5%AD%98/"><span class="tag">缓存</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BC%96%E8%AF%91%E5%8E%9F%E7%90%86/"><span class="tag">编译原理</span><span class="tag">1</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E7%BD%91%E7%BB%9C%E8%99%9A%E6%8B%9F%E5%8C%96/"><span class="tag">网络虚拟化</span><span class="tag">3</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%99%9A%E6%8B%9F%E6%9C%BA/"><span class="tag">虚拟机</span><span class="tag">2</span></a></div><div class="control"><a class="tags has-addons" href="/tags/%E8%AF%AD%E8%A8%80%E7%89%B9%E6%80%A7/"><span class="tag">语言特性</span><span class="tag">2</span></a></div></div></div></div></div><div class="card widget" data-type="profile"><div class="card-content"><nav class="level"><div class="level-item has-text-centered flex-shrink-1"><div><figure class="image is-128x128 mx-auto mb-2"><img class="avatar" src="/img/avatar.jpg"></figure><p class="is-size-6 is-block">公众号：面向问题编程</p></div></div></nav><nav class="level is-mobile"><div class="level-item has-text-centered is-marginless"><div><p class="heading">文章</p><a href="/archives"><p class="title">75</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">分类</p><a href="/categories"><p class="title">5</p></a></div></div><div class="level-item has-text-centered is-marginless"><div><p class="heading">标签</p><a href="/tags"><p class="title">19</p></a></div></div></nav></div></div><div class="card widget" data-type="categories"><div class="card-content"><div class="menu"><h3 class="menu-label">分类</h3><ul class="menu-list"><li><a class="level is-mobile" href="/categories/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3/"><span class="level-start"><span class="level-item">一文了解</span></span><span class="level-end"><span class="level-item tag">33</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E5%AE%9E%E8%B7%B5/"><span class="level-start"><span class="level-item">技术实践</span></span><span class="level-end"><span class="level-item tag">11</span></span></a></li><li><a class="level is-mobile" href="/categories/%E6%8A%80%E6%9C%AF%E6%9E%B6%E6%9E%84/"><span class="level-start"><span class="level-item">技术架构</span></span><span class="level-end"><span class="level-item tag">8</span></span></a></li><li><a class="level is-mobile" href="/categories/%E7%BB%BC%E8%BF%B0/"><span class="level-start"><span class="level-item">综述</span></span><span class="level-end"><span class="level-item tag">1</span></span></a></li><li><a class="level is-mobile" href="/categories/%E9%97%AE%E9%A2%98/"><span class="level-start"><span class="level-item">问题</span></span><span class="level-end"><span class="level-item tag">2</span></span></a></li></ul></div></div></div></div></div></div></section><footer class="footer"><div class="container"><div class="level"><div class="level-start"><a class="footer-logo is-block mb-2" href="/"><img src="/img/logo.svg" alt="面向问题编程" height="28"></a><p class="is-size-7"><span>&copy; 2022 面向问题编程</span></p></div><div class="level-end"><div class="field has-addons"><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Creative Commons" href="https://creativecommons.org/"><i class="fab fa-creative-commons"></i></a></p><p class="control"><a class="button is-transparent is-large" target="_blank" rel="noopener" title="Attribution 4.0 International" href="https://creativecommons.org/licenses/by/4.0/"><i class="fab fa-creative-commons-by"></i></a></p></div></div></div></div></footer><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script><script src="https://cdn.jsdelivr.net/npm/moment@2.22.2/min/moment-with-locales.min.js"></script><script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.4/dist/clipboard.min.js" defer></script><script>moment.locale("zh-CN");</script><script>var IcarusThemeSettings = {
+            article: {
+                highlight: {
+                    clipboard: true,
+                    fold: 'unfolded'
+                }
+            }
+        };</script><script src="/js/column.js"></script><script src="/js/animation.js"></script><a id="back-to-top" title="回到顶端" href="javascript:;"><i class="fas fa-chevron-up"></i></a><script src="/js/back_to_top.js" defer></script><!--!--><!--!--><!--!--><script src="https://cdn.jsdelivr.net/npm/cookieconsent@3.1.1/build/cookieconsent.min.js" defer></script><script>window.addEventListener("load", () => {
+      window.cookieconsent.initialise({
+        type: "info",
+        theme: "edgeless",
+        static: false,
+        position: "bottom-left",
+        content: {
+          message: "此网站使用Cookie来改善您的体验。",
+          dismiss: "知道了！",
+          allow: "允许使用Cookie",
+          deny: "拒绝",
+          link: "了解更多",
+          policy: "Cookie政策",
+          href: "https://www.cookiesandyou.com/",
+        },
+        palette: {
+          popup: {
+            background: "#edeff5",
+            text: "#838391"
+          },
+          button: {
+            background: "#4b81e8"
+          },
+        },
+      });
+    });</script><script src="https://cdn.jsdelivr.net/npm/lightgallery@1.10.0/dist/js/lightgallery.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/lg-zoom@1.3.0/dist/lg-zoom.min.js" defer></script><script src="https://cdn.jsdelivr.net/npm/justifiedGallery@3.8.1/dist/js/jquery.justifiedGallery.min.js" defer></script><script>window.addEventListener("load", () => {
+            if (typeof $.fn.lightGallery === 'function') {
+                $('.article').lightGallery({ selector: '.gallery-item' });
+            }
+            if (typeof $.fn.justifiedGallery === 'function') {
+                if ($('.justified-gallery > p > .gallery-item').length) {
+                    $('.justified-gallery > p > .gallery-item').unwrap();
+                }
+                $('.justified-gallery').justifiedGallery();
+            }
+        });</script><!--!--><!--!--><script type="text/x-mathjax-config">MathJax.Hub.Config({
+            'HTML-CSS': {
+                matchFontHeight: false
+            },
+            SVG: {
+                matchFontHeight: false
+            },
+            CommonHTML: {
+                matchFontHeight: false
+            },
+            tex2jax: {
+                inlineMath: [
+                    ['$','$'],
+                    ['\\(','\\)']
+                ]
+            }
+        });</script><script src="https://cdn.jsdelivr.net/npm/mathjax@2.7.9/unpacked/MathJax.js?config=TeX-MML-AM_CHTML" defer></script><!--!--><!--!--><!--!--><script src="/js/main.js" defer></script><div class="searchbox"><div class="searchbox-container"><div class="searchbox-header"><div class="searchbox-input-container"><input class="searchbox-input" type="text" placeholder="想要查找什么..."></div><a class="searchbox-close" href="javascript:;">×</a></div><div class="searchbox-body"></div></div></div><script src="/js/insight.js" defer></script><script>document.addEventListener('DOMContentLoaded', function () {
+            loadInsight({"contentUrl":"/content.json"}, {"hint":"想要查找什么...","untitled":"(无标题)","posts":"文章","pages":"页面","categories":"分类","tags":"标签"});
+        });</script></body></html>
